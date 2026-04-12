@@ -1,0 +1,5 @@
+{
+  "name": "Vitality Advisor",
+  "description": "An editorial wellness app for tracking nutrition, biometrics, and AI-powered health coaching.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
