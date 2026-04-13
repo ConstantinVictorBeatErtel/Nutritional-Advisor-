@@ -1,26 +1,63 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Leaf, Cake, Ruler, Dumbbell, Scale, Zap, Sparkles, Brain, ArrowRight, Info, Check } from 'lucide-react';
+import { Leaf, Cake, Ruler, Dumbbell, Scale, Zap, Sparkles, Brain, ArrowRight, Check, PersonStanding, User } from 'lucide-react';
 import { cn } from '../lib/utils';
+import {
+  calculateNutritionTargets,
+  defaultProfile,
+  getActivityLabel,
+  getGoalLabel,
+  type ActivityLevel,
+  type GoalDirection,
+  type UserProfile,
+  type WellnessObjective,
+} from '../lib/profile';
 
 interface OnboardingProps {
-  onComplete: () => void;
+  initialProfile?: UserProfile | null;
+  onComplete: (profile: UserProfile) => void;
 }
 
-export default function Onboarding({ onComplete }: OnboardingProps) {
+const objectives: Array<{
+  id: WellnessObjective;
+  label: string;
+  sub: string;
+  icon: typeof Scale;
+  color: string;
+}> = [
+  { id: 'weight', label: 'Optimize Weight', sub: 'Higher-protein, lower-carb emphasis', icon: Scale, color: 'text-primary' },
+  { id: 'performance', label: 'Athletic Performance', sub: 'More training fuel from carbohydrates', icon: Zap, color: 'text-blue-600' },
+  { id: 'vitality', label: 'Holistic Vitality', sub: 'Balanced, sustainable macro split', icon: Sparkles, color: 'text-orange-600' },
+  { id: 'focus', label: 'Cognitive Focus', sub: 'Higher healthy fats for steadier energy', icon: Brain, color: 'text-zinc-600' },
+];
+
+const activityOptions: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'very', 'extra'];
+const goalOptions: GoalDirection[] = ['lose', 'maintain', 'gain'];
+
+export default function Onboarding({ initialProfile, onComplete }: OnboardingProps) {
+  const [profile, setProfile] = useState<UserProfile>(initialProfile ?? defaultProfile);
+  const targets = useMemo(() => calculateNutritionTargets(profile), [profile]);
+  const canSubmit = profile.name.trim().length > 0;
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+    onComplete({ ...profile, name: profile.name.trim() });
+  };
+
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
-      {/* Background Accents */}
       <div className="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-emerald-200/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-5%] w-[35vw] h-[35vw] bg-blue-200/10 rounded-full blur-3xl pointer-events-none" />
 
-      <motion.main 
+      <motion.main
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 bg-white shadow-2xl rounded-3xl overflow-hidden z-10 relative min-h-[800px]"
+        className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-12 bg-white shadow-2xl rounded-3xl overflow-hidden z-10 relative min-h-[800px]"
       >
-        {/* Left Side */}
-        <section className="md:col-span-5 bg-primary relative hidden md:flex flex-col justify-between p-12 text-white overflow-hidden">
+        <section className="md:col-span-4 bg-primary relative hidden md:flex flex-col justify-between p-12 text-white overflow-hidden">
           <div className="absolute inset-0 z-0">
             <img
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr_i3DbK4h128uZp3bwpWWotPXjmLt1afaZ6D2aa3TaSxBmvPQYQz4Av291l4ApSBsj0FdxSGwD5L59ZZ0yI9qEQEExZfCuHLjz1i00cnpaFeL2zmAFrF2yiN6nGegKeA_GjD_Ho6UH3O28xmJTSscyjGmt1PdRxmrdd0hKYr_MPixeYuwjlD3fI4H8D-vzYJKWUmpaBtNAN5jc8SKifYHl3UYRsL1G0NJpRr1a7mElfT-KmtUPZhW-N4l5nv3NsdDMotwtmLeg13s"
@@ -37,145 +74,246 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               <span className="font-headline font-extrabold tracking-tighter text-2xl">The Vitality Edit</span>
             </div>
             <h1 className="font-headline text-5xl font-extrabold leading-[1.1] mb-6 tracking-tight">
-              Your journey to <span className="text-emerald-200">optimal</span> vitality begins.
+              Nutrition targets that actually match your profile.
             </h1>
-            <p className="text-lg opacity-90 font-light leading-relaxed max-w-xs">
-              We're tailoring a nutritional blueprint specifically for your biological needs and lifestyle goals.
+            <p className="text-lg opacity-90 font-light leading-relaxed max-w-sm">
+              Calorie targets use BMR, activity level, and goal direction. Macro targets change with your primary wellness objective.
             </p>
-          </div>
-
-          <div className="relative z-10">
-            <div className="flex -space-x-4 mb-4">
-              {[1, 2, 3].map((i) => (
-                <img
-                  key={i}
-                  src={`https://picsum.photos/seed/user${i}/100/100`}
-                  alt="User"
-                  className="w-10 h-10 rounded-full border-2 border-primary object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ))}
-              <div className="w-10 h-10 rounded-full bg-emerald-400 border-2 border-primary flex items-center justify-center text-xs font-bold text-primary">+2k</div>
-            </div>
-            <p className="text-sm font-medium opacity-80 italic">Join 2,000+ others pursuing peak performance.</p>
           </div>
         </section>
 
-        {/* Right Side */}
-        <section className="md:col-span-7 flex flex-col p-8 md:p-16 overflow-y-auto">
-          <div className="mb-12">
-            <div className="flex justify-between items-end mb-4">
-              <div>
-                <span className="text-primary font-bold text-xs tracking-widest uppercase">Step 01 of 03</span>
-                <h2 className="font-headline text-3xl font-bold text-zinc-900 mt-1">Core Metrics</h2>
-              </div>
-              <span className="text-zinc-500 font-medium text-sm">35% Complete</span>
-            </div>
-            <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: '35%' }}
-                className="h-full bg-primary rounded-full" 
-              />
-            </div>
+        <section className="md:col-span-8 flex flex-col p-8 md:p-16 overflow-y-auto">
+          <div className="mb-10">
+            <span className="text-primary font-bold text-xs tracking-widest uppercase">Profile</span>
+            <h2 className="font-headline text-3xl font-bold text-zinc-900 mt-2">Build your nutrition targets</h2>
+            <p className="mt-3 text-zinc-500 max-w-2xl">
+              Enter the basics once, then the dashboard and daily coach will compare your confirmed meals against these calculated targets.
+            </p>
           </div>
 
-          <form className="space-y-10" onSubmit={(e) => { e.preventDefault(); onComplete(); }}>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="flex flex-col space-y-2">
-                <label className="text-sm font-semibold text-zinc-600 flex items-center gap-2">
-                  <Cake className="w-4 h-4" /> Age
-                </label>
-                <input 
-                  type="number" 
-                  placeholder="28"
+          <form className="space-y-8" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+              <Field label="Your Name" icon={User}>
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={profile.name}
+                  onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))}
                   className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
                 />
-              </div>
-              <div className="flex flex-col space-y-2">
-                <label className="text-sm font-semibold text-zinc-600 flex items-center gap-2">
-                  <Ruler className="w-4 h-4 rotate-[-90deg]" /> Height (cm)
-                </label>
-                <input 
-                  type="number" 
-                  placeholder="175"
+              </Field>
+              <Field label="Age" icon={Cake}>
+                <input
+                  type="number"
+                  min="10"
+                  max="100"
+                  value={profile.age}
+                  onChange={(event) => setProfile((current) => ({ ...current, age: Number(event.target.value) || 0 }))}
                   className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
                 />
-              </div>
-              <div className="flex flex-col space-y-2">
-                <label className="text-sm font-semibold text-zinc-600 flex items-center gap-2">
-                  <Scale className="w-4 h-4" /> Weight (kg)
-                </label>
-                <input 
-                  type="number" 
-                  placeholder="72"
+              </Field>
+              <Field label="Height (cm)" icon={Ruler}>
+                <input
+                  type="number"
+                  min="100"
+                  max="250"
+                  value={profile.heightCm}
+                  onChange={(event) => setProfile((current) => ({ ...current, heightCm: Number(event.target.value) || 0 }))}
                   className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
                 />
-              </div>
+              </Field>
+              <Field label="Weight (kg)" icon={Scale}>
+                <input
+                  type="number"
+                  min="30"
+                  max="300"
+                  step="0.1"
+                  value={profile.weightKg}
+                  onChange={(event) => setProfile((current) => ({ ...current, weightKg: Number(event.target.value) || 0 }))}
+                  className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
+                />
+              </Field>
+              <Field label="Biological Sex" icon={PersonStanding}>
+                <select
+                  value={profile.biologicalSex}
+                  onChange={(event) => setProfile((current) => ({ ...current, biologicalSex: event.target.value as UserProfile['biologicalSex'] }))}
+                  className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <Field label="Activity Level" icon={Dumbbell}>
+                <div className="grid grid-cols-2 gap-3">
+                  {activityOptions.map((activityLevel) => (
+                    <button
+                      key={activityLevel}
+                      type="button"
+                      onClick={() => setProfile((current) => ({ ...current, activityLevel }))}
+                      className={cn(
+                        'rounded-2xl border px-4 py-4 text-left transition-all min-h-[88px] flex items-center',
+                        profile.activityLevel === activityLevel
+                          ? 'border-primary bg-emerald-50 text-zinc-900 shadow-sm'
+                          : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300',
+                      )}
+                    >
+                      <span className="block font-bold text-zinc-900 leading-snug">{getActivityLabel(activityLevel)}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label="Goal Direction" icon={ArrowRight}>
+                <div className="grid grid-cols-3 gap-3">
+                  {goalOptions.map((goal) => (
+                    <button
+                      key={goal}
+                      type="button"
+                      onClick={() => setProfile((current) => ({ ...current, goal }))}
+                      className={cn(
+                        'rounded-2xl border px-3 py-4 text-center transition-all min-h-[88px] flex items-center justify-center',
+                        profile.goal === goal
+                          ? 'border-primary bg-emerald-50 text-zinc-900 shadow-sm'
+                          : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300',
+                      )}
+                    >
+                      <span className="block font-bold leading-snug text-base break-words max-w-[8ch]">
+                        {goal === 'maintain' ? 'Maintenance' : getGoalLabel(goal)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {profile.goal !== 'maintain' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="Target weight (kg)"
+                      value={profile.targetWeightKg ?? ''}
+                      onChange={(event) =>
+                        setProfile((current) => ({
+                          ...current,
+                          targetWeightKg: event.target.value ? Number(event.target.value) : null,
+                        }))
+                      }
+                      className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
+                    />
+                    <input
+                      type="number"
+                      min="7"
+                      placeholder="Timeline (days)"
+                      value={profile.targetDays ?? ''}
+                      onChange={(event) =>
+                        setProfile((current) => ({
+                          ...current,
+                          targetDays: event.target.value ? Number(event.target.value) : null,
+                        }))
+                      }
+                      className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
+                    />
+                  </div>
+                ) : null}
+              </Field>
             </div>
 
             <div>
               <label className="text-sm font-semibold text-zinc-600 block mb-4">Primary Wellness Objective</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { id: 'weight', label: 'Optimize Weight', sub: 'Focus on metabolic efficiency', icon: Scale, color: 'text-primary' },
-                  { id: 'performance', label: 'Athletic Performance', sub: 'Macro-loading for strength', icon: Zap, color: 'text-blue-600' },
-                  { id: 'vitality', label: 'Holistic Vitality', sub: 'Longevity and steady energy', icon: Sparkles, color: 'text-orange-600' },
-                  { id: 'focus', label: 'Cognitive Focus', sub: 'Brain-fuel and mental clarity', icon: Brain, color: 'text-zinc-600' },
-                ].map((goal) => (
+                {objectives.map((goal) => (
                   <button
                     key={goal.id}
                     type="button"
+                    onClick={() => setProfile((current) => ({ ...current, wellnessObjective: goal.id }))}
                     className={cn(
-                      "group relative flex flex-col p-5 rounded-2xl text-left transition-all active:scale-95 border-2",
-                      goal.id === 'weight' ? "bg-white border-primary shadow-lg" : "bg-zinc-50 border-transparent hover:border-zinc-200"
+                      'group relative flex flex-col p-5 rounded-2xl text-left transition-all active:scale-95 border-2 min-h-[166px]',
+                      profile.wellnessObjective === goal.id
+                        ? 'bg-white border-primary shadow-lg'
+                        : 'bg-zinc-50 border-transparent hover:border-zinc-200',
                     )}
                   >
-                    <goal.icon className={cn("w-8 h-8 mb-3", goal.color)} />
+                    <goal.icon className={cn('w-8 h-8 mb-3', goal.color)} />
                     <span className="font-headline font-bold text-zinc-900">{goal.label}</span>
-                    <span className="text-xs text-zinc-500 mt-1">{goal.sub}</span>
-                    {goal.id === 'weight' && (
+                    <span className="text-xs text-zinc-500 mt-1 leading-relaxed">{goal.sub}</span>
+                    {profile.wellnessObjective === goal.id ? (
                       <div className="absolute top-4 right-4 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
                         <Check className="w-3 h-3 text-white" />
                       </div>
-                    )}
+                    ) : null}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-semibold text-zinc-600">Daily Sleep Duration</label>
-                <span className="text-primary font-bold">7.5 Hours</span>
+            <div className="rounded-3xl border border-zinc-100 bg-zinc-50 px-6 py-6">
+              <h3 className="text-lg font-bold text-zinc-900">Nutrition Math Summary</h3>
+              <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Metric label="BMR" value={`${targets.bmr} kcal`} />
+                <Metric label="TDEE" value={`${targets.tdee} kcal`} />
+                <Metric label="Target Calories" value={`${targets.targetCalories} kcal`} />
+                <Metric label="Adjustment" value={`${targets.calorieAdjustment >= 0 ? '+' : ''}${targets.calorieAdjustment} kcal`} />
+                <Metric label="Protein" value={`${targets.proteinG} g`} />
+                <Metric label="Carbs" value={`${targets.carbsG} g`} />
+                <Metric label="Fat" value={`${targets.fatG} g`} />
+                <Metric
+                  label="Macro Split"
+                  value={`${Math.round(targets.macroPercentages.protein * 100)}/${Math.round(targets.macroPercentages.fat * 100)}/${Math.round(targets.macroPercentages.carbs * 100)}`}
+                />
               </div>
-              <input 
-                type="range" 
-                min="4" max="12" step="0.5" defaultValue="7.5"
-                className="w-full h-2 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-primary"
-              />
-              <div className="flex justify-between text-[10px] text-zinc-400 uppercase tracking-widest font-bold">
-                <span>Minimal (4h)</span>
-                <span>Optimal (7.5h)</span>
-                <span>Extended (12h)</span>
-              </div>
+              <p className="mt-4 text-sm text-zinc-500 leading-relaxed">
+                Sanity check: calories come from Mifflin-St Jeor BMR, activity-based TDEE, and a capped daily adjustment toward your target weight. Macro grams come from the objective-based percentage split, converted using 4 kcal/g for protein and carbs plus 9 kcal/g for fats.
+              </p>
             </div>
 
-            <div className="pt-6 flex flex-col gap-4">
-              <button 
+            <div className="pt-2 flex flex-col gap-4">
+              <button
                 type="submit"
-                className="w-full bg-gradient-to-br from-primary to-emerald-600 text-white font-headline font-bold py-5 px-8 rounded-2xl shadow-xl shadow-emerald-900/10 hover:shadow-emerald-900/20 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                disabled={!canSubmit}
+                className={cn(
+                  'w-full bg-gradient-to-br from-primary to-emerald-600 text-white font-headline font-bold py-5 px-8 rounded-2xl shadow-xl shadow-emerald-900/10 transition-all flex items-center justify-center gap-3 active:scale-[0.98]',
+                  canSubmit ? 'hover:shadow-emerald-900/20' : 'opacity-60 cursor-not-allowed',
+                )}
               >
-                Continue to Diet Profile
+                Save Profile
                 <ArrowRight className="w-5 h-5" />
               </button>
-              <p className="text-center text-xs text-zinc-400 leading-relaxed max-w-sm mx-auto">
-                By continuing, you agree to our <span className="underline font-medium text-zinc-900 cursor-pointer">Privacy Policy</span> regarding your biometric data processing.
-              </p>
+              {!canSubmit ? <p className="text-sm text-zinc-500">Enter your name to continue.</p> : null}
             </div>
           </form>
         </section>
       </motion.main>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  icon: typeof Cake;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col space-y-2">
+      <label className="text-sm font-semibold text-zinc-600 flex items-center gap-2">
+        <Icon className="w-4 h-4" />
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white px-4 py-5 border border-zinc-100">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{label}</p>
+      <p className="mt-2 text-lg font-bold text-zinc-900 leading-snug">{value}</p>
     </div>
   );
 }

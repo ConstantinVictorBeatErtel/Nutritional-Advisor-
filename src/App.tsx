@@ -3,63 +3,123 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Onboarding from './screens/Onboarding';
 import Dashboard from './screens/Dashboard';
 import Coach from './screens/Coach';
 import LogMeal from './screens/LogMeal';
-import { motion, AnimatePresence } from 'motion/react';
+import { loadLoggedMeals, saveLoggedMeals, type LoggedMeal } from './lib/meal-log';
+import {
+  calculateNutritionTargets,
+  loadUserProfile,
+  saveUserProfile,
+  type UserProfile,
+} from './lib/profile';
 
 type Screen = 'onboarding' | 'dashboard' | 'logs' | 'coach';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('onboarding');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(() => loadUserProfile());
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    const savedProfile = loadUserProfile();
+    return savedProfile?.name?.trim() ? 'dashboard' : 'onboarding';
+  });
+  const [loggedMeals, setLoggedMeals] = useState<LoggedMeal[]>(() => loadLoggedMeals());
+  const nutritionTargets = useMemo(() => (profile ? calculateNutritionTargets(profile) : null), [profile]);
+
+  useEffect(() => {
+    saveLoggedMeals(loggedMeals);
+  }, [loggedMeals]);
+
+  useEffect(() => {
+    if (profile) {
+      saveUserProfile(profile);
+    }
+  }, [profile]);
+
+  const handleMealLogged = (meal: LoggedMeal) => {
+    setLoggedMeals((currentMeals) => [meal, ...currentMeals].slice(0, 20));
+    setCurrentScreen('dashboard');
+  };
+
+  const handleProfileSaved = (nextProfile: UserProfile) => {
+    setProfile(nextProfile);
+    setCurrentScreen('dashboard');
+  };
 
   const renderScreen = () => {
+    if (!profile || !nutritionTargets) {
+      return <Onboarding initialProfile={profile} onComplete={handleProfileSaved} />;
+    }
+
     switch (currentScreen) {
       case 'onboarding':
-        return <Onboarding onComplete={() => setCurrentScreen('dashboard')} />;
+        return <Onboarding initialProfile={profile} onComplete={handleProfileSaved} />;
       case 'dashboard':
-        return <Dashboard onLogMeal={() => setCurrentScreen('logs')} />;
+        return (
+          <Dashboard
+            meals={loggedMeals}
+            profile={profile}
+            nutritionTargets={nutritionTargets}
+            onLogMeal={() => setCurrentScreen('logs')}
+            onEditProfile={() => setCurrentScreen('onboarding')}
+          />
+        );
       case 'logs':
-        return <LogMeal onComplete={() => setCurrentScreen('dashboard')} />;
+        return <LogMeal onComplete={() => setCurrentScreen('dashboard')} onMealLogged={handleMealLogged} />;
       case 'coach':
-        return <Coach />;
+        return <Coach meals={loggedMeals} profile={profile} nutritionTargets={nutritionTargets} />;
       default:
-        return <Dashboard onLogMeal={() => setCurrentScreen('logs')} />;
+        return (
+          <Dashboard
+            meals={loggedMeals}
+            profile={profile}
+            nutritionTargets={nutritionTargets}
+            onLogMeal={() => setCurrentScreen('logs')}
+            onEditProfile={() => setCurrentScreen('onboarding')}
+          />
+        );
     }
   };
 
   const getTitle = () => {
     switch (currentScreen) {
-      case 'dashboard': return 'Your Daily Vitality';
-      case 'logs': return 'Log Your Meal';
-      case 'coach': return 'Coach Insights';
-      default: return '';
+      case 'dashboard':
+        return 'Daily Targets';
+      case 'logs':
+        return 'Log Meal';
+      case 'coach':
+        return 'Daily Coach';
+      case 'onboarding':
+        return 'Profile';
+      default:
+        return '';
     }
   };
 
-  if (currentScreen === 'onboarding') {
-    return <Onboarding onComplete={() => setCurrentScreen('dashboard')} />;
+  if (!profile || !profile.name.trim() || currentScreen === 'onboarding') {
+    return <Onboarding initialProfile={profile} onComplete={handleProfileSaved} />;
   }
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar 
-        activeTab={currentScreen} 
-        setActiveTab={(tab) => setCurrentScreen(tab as Screen)} 
+      <Sidebar
+        activeTab={currentScreen}
+        setActiveTab={(tab) => setCurrentScreen(tab as Screen)}
+        userName={profile.name}
       />
-      
+
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto hide-scrollbar">
-        <TopBar 
-          title={getTitle()} 
+        <TopBar
+          title={getTitle()}
+          userName={profile.name}
           showBack={currentScreen === 'logs'}
           onBack={() => setCurrentScreen('dashboard')}
         />
-        
+
         <div className="flex-1">
           <AnimatePresence mode="wait">
             <motion.div
@@ -74,7 +134,6 @@ export default function App() {
           </AnimatePresence>
         </div>
 
-        {/* Mobile Nav */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl flex items-center justify-around px-6 z-50 border-t border-zinc-100">
           {[
             { id: 'dashboard', label: 'Home' },
