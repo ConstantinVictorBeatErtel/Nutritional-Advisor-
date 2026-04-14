@@ -360,21 +360,22 @@ app.post('/api/vision/analyze', async (request, response) => {
 
 function inferUserGroup(profileSummary: string) {
   const diagnosedConditions = extractProfileField(profileSummary, 'Diagnosed conditions').toLowerCase();
-  if (diagnosedConditions) {
-    if (diagnosedConditions.includes('diabetes')) {
-      return 'Adult/Diabetes Risk';
-    }
-    if (diagnosedConditions.includes('depression')) {
-      return 'Adult/Mental Health Risk';
-    }
-    if (diagnosedConditions.includes('sleep difficulties')) {
-      return 'Adult/Sleep Risk';
-    }
-    if (diagnosedConditions.includes('none of the above')) {
-      return 'Adult/Standard Health';
-    }
 
-    return 'Adult/Standard Health';
+  const hasDiabetes = diagnosedConditions.includes('diabetes');
+  const hasDepression = diagnosedConditions.includes('depression');
+  const hasSleep = diagnosedConditions.includes('sleep difficulties');
+
+  if (hasDiabetes && hasDepression) {
+    return 'Adult/Diabetes+Depression';
+  }
+  if (hasDiabetes) {
+    return 'Adult/Diabetes Risk';
+  }
+  if (hasDepression) {
+    return 'Adult/Mental Health Risk';
+  }
+  if (hasSleep) {
+    return 'Adult/Sleep Risk';
   }
 
   const text = profileSummary.toLowerCase();
