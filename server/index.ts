@@ -360,14 +360,21 @@ app.post('/api/vision/analyze', async (request, response) => {
 
 function inferUserGroup(profileSummary: string) {
   const diagnosedConditions = extractProfileField(profileSummary, 'Diagnosed conditions').toLowerCase();
-  if (diagnosedConditions.includes('diabetes')) {
-    return 'Adult/Diabetes Risk';
-  }
-  if (diagnosedConditions.includes('depression')) {
-    return 'Adult/Mental Health Risk';
-  }
-  if (diagnosedConditions.includes('sleep difficulties')) {
-    return 'Adult/Sleep Risk';
+  if (diagnosedConditions) {
+    if (diagnosedConditions.includes('diabetes')) {
+      return 'Adult/Diabetes Risk';
+    }
+    if (diagnosedConditions.includes('depression')) {
+      return 'Adult/Mental Health Risk';
+    }
+    if (diagnosedConditions.includes('sleep difficulties')) {
+      return 'Adult/Sleep Risk';
+    }
+    if (diagnosedConditions.includes('none of the above')) {
+      return 'Adult/Standard Health';
+    }
+
+    return 'Adult/Standard Health';
   }
 
   const text = profileSummary.toLowerCase();
@@ -391,6 +398,24 @@ function extractProfileField(profileSummary: string, field: string) {
   return match?.[1]?.trim() || '';
 }
 
+function buildPlanPreferenceInstruction(nutritionPlanPreference: string) {
+  const text = nutritionPlanPreference.toLowerCase();
+  if (text.includes('1-day meal plan')) {
+    return 'Shape the advice like a 1-day meal plan with clear meal-by-meal guidance.';
+  }
+  if (text.includes('1-week meal plan')) {
+    return 'Shape the advice like a 1-week plan with variation across days.';
+  }
+  if (text.includes('recommended targets')) {
+    return 'Focus on calorie and macro targets only. Do not suggest a full meal plan.';
+  }
+  if (text.includes('intake critique')) {
+    return 'Prioritize critiquing the current intake and recommend specific adjustments.';
+  }
+
+  return 'Tailor the advice to the preferred nutrition plan style when possible.';
+}
+
 function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
   const profileSummary = body.profileSummary || '';
   const age = extractProfileField(profileSummary, 'Age');
@@ -399,6 +424,7 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
   const goal = extractProfileField(profileSummary, 'Goal') || 'Maintenance';
   const diagnosedConditions = extractProfileField(profileSummary, 'Diagnosed conditions');
   const nutritionPlanPreference = extractProfileField(profileSummary, 'Nutrition plan type preference');
+  const planPreferenceInstruction = buildPlanPreferenceInstruction(nutritionPlanPreference);
   const userGroup = inferUserGroup(profileSummary);
   const conditions = diagnosedConditions || (
     userGroup.includes('Diabetes')
@@ -423,6 +449,7 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
     `Age: ${age || '28'} | Gender: ${extractProfileField(profileSummary, 'Biological sex for BMR math') || 'Unknown'} | Weight: ${weight || 'Unknown'} | Height: ${height || 'Unknown'}`,
     `Conditions: ${conditions}`,
     `Nutrition plan preference: ${nutritionPlanPreference || 'No stated preference'}`,
+    `Plan handling: ${planPreferenceInstruction}`,
     '',
     'Current Intake:',
     `  Total:     ${Math.round(totals.calories)}cal | P:${Math.round(totals.protein)}g | F:${Math.round(totals.fat)}g | C:${Math.round(totals.carbs)}g`,
@@ -430,7 +457,7 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
     '',
     `Goal: ${goal}`,
     `Targets:\n${body.goalsSummary || 'Not provided'}`,
-    'Request: Review today’s intake against the targets and provide practical diet advice only.',
+    'Request: Review today’s intake against the targets, account for the diagnosed conditions and user group, and follow the selected nutrition plan style.',
   ].join('\n');
 }
 
