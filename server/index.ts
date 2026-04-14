@@ -359,6 +359,17 @@ app.post('/api/vision/analyze', async (request, response) => {
 });
 
 function inferUserGroup(profileSummary: string) {
+  const diagnosedConditions = extractProfileField(profileSummary, 'Diagnosed conditions').toLowerCase();
+  if (diagnosedConditions.includes('diabetes')) {
+    return 'Adult/Diabetes Risk';
+  }
+  if (diagnosedConditions.includes('depression')) {
+    return 'Adult/Mental Health Risk';
+  }
+  if (diagnosedConditions.includes('sleep issues')) {
+    return 'Adult/Sleep Risk';
+  }
+
   const text = profileSummary.toLowerCase();
   if (text.includes('cognitive focus')) {
     return 'Adult/Mental Health Risk';
@@ -386,12 +397,18 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
   const weight = extractProfileField(profileSummary, 'Weight');
   const height = extractProfileField(profileSummary, 'Height');
   const goal = extractProfileField(profileSummary, 'Goal') || 'Maintenance';
+  const diagnosedConditions = extractProfileField(profileSummary, 'Diagnosed conditions');
+  const nutritionPlanPreference = extractProfileField(profileSummary, 'Nutrition plan type preference');
   const userGroup = inferUserGroup(profileSummary);
-  const conditions = userGroup.includes('Diabetes')
-    ? 'Diabetes'
-    : userGroup.includes('Mental Health')
-      ? 'Depression risk'
-      : 'None reported';
+  const conditions = diagnosedConditions || (
+    userGroup.includes('Diabetes')
+      ? 'Diabetes'
+      : userGroup.includes('Mental Health')
+        ? 'Depression risk'
+        : userGroup.includes('Sleep')
+          ? 'Sleep issues'
+          : 'None reported'
+  );
 
   const meals = Array.isArray(body.meals) ? body.meals : [];
   const mealLines = meals
@@ -405,6 +422,7 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
     `[USER GROUP: ${userGroup}]`,
     `Age: ${age || '28'} | Gender: ${extractProfileField(profileSummary, 'Biological sex for BMR math') || 'Unknown'} | Weight: ${weight || 'Unknown'} | Height: ${height || 'Unknown'}`,
     `Conditions: ${conditions}`,
+    `Nutrition plan preference: ${nutritionPlanPreference || 'No stated preference'}`,
     '',
     'Current Intake:',
     `  Total:     ${Math.round(totals.calories)}cal | P:${Math.round(totals.protein)}g | F:${Math.round(totals.fat)}g | C:${Math.round(totals.carbs)}g`,

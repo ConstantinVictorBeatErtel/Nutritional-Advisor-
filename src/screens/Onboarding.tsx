@@ -1,13 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Leaf, Cake, Ruler, Dumbbell, Scale, Zap, Sparkles, Brain, ArrowRight, Check, PersonStanding, User } from 'lucide-react';
+import { Leaf, Cake, Ruler, Dumbbell, Scale, Zap, Sparkles, Brain, ArrowRight, Check, PersonStanding, User, HeartPulse, ClipboardPenLine } from 'lucide-react';
 import { cn } from '../lib/utils';
 import {
   calculateNutritionTargets,
   defaultProfile,
+  getDiagnosedConditionLabel,
   getActivityLabel,
   getGoalLabel,
   type ActivityLevel,
+  type DiagnosedCondition,
   type GoalDirection,
   type UserProfile,
   type WellnessObjective,
@@ -33,6 +35,7 @@ const objectives: Array<{
 
 const activityOptions: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'very', 'extra'];
 const goalOptions: GoalDirection[] = ['lose', 'maintain', 'gain'];
+const diagnosedConditionOptions: DiagnosedCondition[] = ['diabetes', 'depression', 'sleep-issues', 'none'];
 
 export default function Onboarding({ initialProfile, onComplete }: OnboardingProps) {
   const [profile, setProfile] = useState<UserProfile>(initialProfile ?? defaultProfile);
@@ -246,6 +249,43 @@ export default function Onboarding({ initialProfile, onComplete }: OnboardingPro
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <Field label="Diagnosed Conditions" icon={HeartPulse}>
+                <div className="grid grid-cols-2 gap-3">
+                  {diagnosedConditionOptions.map((condition) => (
+                    <button
+                      key={condition}
+                      type="button"
+                      onClick={() => setProfile((current) => ({ ...current, diagnosedCondition: condition }))}
+                      className={cn(
+                        'rounded-2xl border px-4 py-4 text-left transition-all min-h-[88px] flex items-center',
+                        profile.diagnosedCondition === condition
+                          ? 'border-primary bg-emerald-50 text-zinc-900 shadow-sm'
+                          : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300',
+                      )}
+                    >
+                      <span className="block font-bold text-zinc-900 leading-snug">{getDiagnosedConditionLabel(condition)}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label="Nutrition Plan Type Preference" icon={ClipboardPenLine}>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Balanced, Mediterranean, high-protein..."
+                    value={profile.nutritionPlanPreference}
+                    onChange={(event) => setProfile((current) => ({ ...current, nutritionPlanPreference: event.target.value }))}
+                    className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
+                  />
+                  <p className="text-sm text-zinc-500 leading-relaxed">
+                    Save the plan style they prefer so coaching can stay aligned with it.
+                  </p>
+                </div>
+              </Field>
             </div>
 
             <div className="rounded-3xl border border-zinc-100 bg-zinc-50 px-6 py-6">

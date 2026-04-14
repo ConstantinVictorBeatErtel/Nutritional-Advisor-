@@ -2,6 +2,7 @@ export type BiologicalSex = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very' | 'extra';
 export type GoalDirection = 'lose' | 'maintain' | 'gain';
 export type WellnessObjective = 'weight' | 'performance' | 'vitality' | 'focus';
+export type DiagnosedCondition = 'diabetes' | 'depression' | 'sleep-issues' | 'none';
 
 export interface UserProfile {
   name: string;
@@ -14,6 +15,8 @@ export interface UserProfile {
   targetWeightKg: number | null;
   targetDays: number | null;
   wellnessObjective: WellnessObjective;
+  diagnosedCondition: DiagnosedCondition;
+  nutritionPlanPreference: string;
 }
 
 export interface NutritionTargets {
@@ -44,6 +47,8 @@ export const defaultProfile: UserProfile = {
   targetWeightKg: null,
   targetDays: null,
   wellnessObjective: 'weight',
+  diagnosedCondition: 'none',
+  nutritionPlanPreference: '',
 };
 
 const activityMultipliers: Record<ActivityLevel, number> = {
@@ -73,6 +78,13 @@ const objectiveLabels: Record<WellnessObjective, string> = {
   performance: 'Athletic Performance',
   vitality: 'Holistic Vitality',
   focus: 'Cognitive Focus',
+};
+
+const diagnosedConditionLabels: Record<DiagnosedCondition, string> = {
+  diabetes: 'Diabetes',
+  depression: 'Depression',
+  'sleep-issues': 'Sleep Issues',
+  none: 'None',
 };
 
 const macroPercentagesByObjective: Record<
@@ -208,6 +220,10 @@ export function getObjectiveLabel(wellnessObjective: WellnessObjective) {
   return objectiveLabels[wellnessObjective];
 }
 
+export function getDiagnosedConditionLabel(condition: DiagnosedCondition) {
+  return diagnosedConditionLabels[condition];
+}
+
 export function buildProfileSummary(profile: UserProfile) {
   return [
     profile.name ? `Name: ${profile.name}` : null,
@@ -218,6 +234,8 @@ export function buildProfileSummary(profile: UserProfile) {
     `Activity level: ${getActivityLabel(profile.activityLevel)}`,
     `Goal: ${getGoalLabel(profile.goal)}`,
     `Primary objective: ${getObjectiveLabel(profile.wellnessObjective)}`,
+    `Diagnosed conditions: ${getDiagnosedConditionLabel(profile.diagnosedCondition)}`,
+    profile.nutritionPlanPreference.trim() ? `Nutrition plan type preference: ${profile.nutritionPlanPreference.trim()}` : null,
     profile.targetWeightKg ? `Target weight: ${profile.targetWeightKg} kg` : null,
     profile.targetDays ? `Target timeline: ${profile.targetDays} days` : null,
   ].filter(Boolean).join('\n');
