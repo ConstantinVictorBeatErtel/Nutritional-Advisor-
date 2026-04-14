@@ -20,6 +20,7 @@ This version uses a local Express API for meal-photo analysis and daily coaching
    AI_API_KEY="sk-or-v1-..."
    AI_HTTP_REFERER="http://127.0.0.1:3000"
    AI_APP_TITLE="Nutritional Advisor"
+   AI_REVIEW_API_BASE_URL="http://127.0.0.1:8000"
    VITE_APP_API_BASE_URL="http://127.0.0.1:8787"
    ```
 
@@ -34,4 +35,4 @@ This version uses a local Express API for meal-photo analysis and daily coaching
 
 - The dashboard now calculates calorie and macro targets from the nutrition math document using BMR, TDEE, goal adjustment, and macro formulas.
 - The onboarding flow now saves a real profile instead of using fixed demo values.
-- The coach screen now shows a real generated daily review from confirmed meals only, with a timestamp and meal count.
+- The coach screen now calls the attached nutrition review API contract (`POST /analyze` returning `{"advice": ...}`), with a timestamp and meal count.

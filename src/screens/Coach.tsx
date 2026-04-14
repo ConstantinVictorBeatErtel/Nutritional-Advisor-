@@ -18,9 +18,7 @@ interface CoachProps {
 }
 
 const FALLBACK_FEEDBACK: DailyCoachFeedback = {
-  headline: 'Daily feedback unlocks after your first confirmed meal.',
-  summary: 'Once you confirm at least one meal, this screen will generate a real review against today’s calorie and macro targets.',
-  next_action: 'Confirm your first meal to generate a daily review.',
+  advice: 'Log a meal to unlock today’s review.',
   generated_at: new Date().toISOString(),
   meal_count: 0,
 };
@@ -32,6 +30,13 @@ function formatDateTime(value: string) {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function splitAdvice(advice: string) {
+  return advice
+    .split(/\n{2,}/)
+    .map((section) => section.trim())
+    .filter(Boolean);
 }
 
 export default function Coach({ meals, profile, nutritionTargets }: CoachProps) {
@@ -69,6 +74,8 @@ export default function Coach({ meals, profile, nutritionTargets }: CoachProps) 
     void loadFeedback();
   }, [meals, profile, nutritionTargets]);
 
+  const adviceSections = splitAdvice(feedback.advice);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -82,7 +89,7 @@ export default function Coach({ meals, profile, nutritionTargets }: CoachProps) 
             Today&apos;s <span className="text-primary italic">Review</span>
           </h2>
           <p className="mt-4 text-zinc-500 max-w-2xl leading-relaxed">
-            This review is generated from your confirmed meals and compared against the profile-based targets calculated from the nutrition math.
+            This review comes from the attached nutrition review API using your confirmed meals, saved profile, and calculated targets.
           </p>
         </div>
 
@@ -111,24 +118,23 @@ export default function Coach({ meals, profile, nutritionTargets }: CoachProps) 
               <BrainCircuit className="w-7 h-7 fill-orange-600/10" />
             </div>
             <div>
-              <h3 className="text-3xl font-extrabold tracking-tight text-zinc-900">{feedback.headline}</h3>
-              <p className="mt-3 text-zinc-600 leading-relaxed max-w-3xl">{feedback.summary}</p>
+              <h3 className="text-3xl font-extrabold tracking-tight text-zinc-900">Nutrition Review</h3>
+              <div className="mt-4 space-y-4 max-w-3xl">
+                {adviceSections.map((section, index) => (
+                  <p key={index} className="text-zinc-600 leading-relaxed whitespace-pre-wrap">
+                    {section}
+                  </p>
+                ))}
+              </div>
             </div>
           </div>
 
           <div className="rounded-2xl bg-zinc-50 border border-zinc-100 px-5 py-4 text-sm text-zinc-500 min-w-[240px]">
-            <p>
-              Generated {formatDateTime(feedback.generated_at)}
-            </p>
+            <p>Generated {formatDateTime(feedback.generated_at)}</p>
             <p className="mt-1">
               Based on {feedback.meal_count} confirmed meal{feedback.meal_count === 1 ? '' : 's'}
             </p>
           </div>
-        </div>
-
-        <div className="mt-8 rounded-3xl bg-emerald-50 border border-emerald-100 px-6 py-5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Next Action</p>
-          <p className="mt-2 text-lg font-bold text-emerald-900">{feedback.next_action}</p>
         </div>
       </section>
 

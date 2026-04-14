@@ -11,8 +11,8 @@ const API_KEY = process.env.AI_API_KEY?.trim() || process.env.OPENROUTER_API_KEY
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const APP_TITLE = process.env.AI_APP_TITLE?.trim() || process.env.OPENROUTER_APP_TITLE?.trim() || 'Nutritional Advisor';
 const APP_REFERER = process.env.AI_HTTP_REFERER?.trim() || process.env.OPENROUTER_HTTP_REFERER?.trim() || process.env.APP_URL?.trim() || 'http://127.0.0.1:3000';
-const VISION_MODEL = process.env.AI_VISION_MODEL?.trim() || process.env.OPENROUTER_VISION_MODEL?.trim() || 'moonshotai/kimi-k2.5:nitro';
-const COACH_MODEL = process.env.AI_COACH_MODEL?.trim() || process.env.OPENROUTER_COACH_MODEL?.trim() || 'moonshotai/kimi-k2-thinking:nitro';
+const REVIEW_API_BASE_URL = (process.env.AI_REVIEW_API_BASE_URL?.trim() || 'http://127.0.0.1:8000').replace(/\/$/, '');
+const PYTHON_VISION_URL = (process.env.VISION_PYTHON_URL?.trim() || 'http://127.0.0.1:8010/api/vision/analyze').replace(/\/$/, '');
 
 app.use(express.json({ limit: '15mb' }));
 app.use((request, response, next) => {
@@ -59,16 +59,19 @@ interface VisionRequestBody {
   portionText?: string;
 }
 
-interface VisionResponseBody {
-  meal_name: string;
-  meal_type: string;
+interface PythonVisionResponseBody {
+  meal_name?: string;
+  meal_type?: string;
   calories: number;
   protein_g: number;
   carbs_g: number;
   fat_g: number;
   confidence: number;
   predicted_portion_g: number | null;
-  prompt_text: string;
+  prompt_text?: string;
+  route?: string;
+  ingredients_text?: string | null;
+  portion_text?: string | null;
 }
 
 interface CoachRequestBody {
@@ -78,13 +81,8 @@ interface CoachRequestBody {
   profileSummary?: string;
 }
 
-interface CoachModelResponseBody {
-  headline: string;
-  summary: string;
-  next_action: string;
-}
-
-interface CoachApiResponseBody extends CoachModelResponseBody {
+interface CoachApiResponseBody {
+  advice: string;
   generated_at: string;
   meal_count: number;
 }
@@ -240,21 +238,84 @@ const visionSchema = {
   ],
 };
 
-const coachSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    headline: { type: 'string' },
-    summary: { type: 'string' },
-    next_action: { type: 'string' },
-  },
-  required: ['headline', 'summary', 'next_action'],
-};
+function parseDataUrl(imageDataUrl: string) {
+  const match = imageDataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) {
+    const error = new Error('imageDataUrl must be a valid base64-encoded image data URL.');
+    (error as Error & { status?: number }).status = 400;
+    throw error;
+  }
+
+  const [, mimeType, base64Payload] = match;
+  return {
+    mimeType,
+    buffer: Buffer.from(base64Payload, 'base64'),
+  };
+}
+
+function guessFileExtension(mimeType: string) {
+  switch (mimeType.toLowerCase()) {
+    case 'image/png':
+      return 'png';
+    case 'image/webp':
+      return 'webp';
+    case 'image/gif':
+      return 'gif';
+    default:
+      return 'jpg';
+  }
+}
+
+async function callPythonVisionService({
+  imageDataUrl,
+  ingredientsText,
+  portionText,
+}: {
+  imageDataUrl: string;
+  ingredientsText?: string;
+  portionText?: string;
+}): Promise<PythonVisionResponseBody> {
+  const { mimeType, buffer } = parseDataUrl(imageDataUrl);
+  const ingredients = ingredientsText?.trim() || '';
+  const portion = portionText?.trim() || '';
+  const description = [ingredients && `Ingredients: ${ingredients}`, portion && `Portion: ${portion}`]
+    .filter(Boolean)
+    .join('\n');
+
+  const formData = new FormData();
+  formData.append('image', new Blob([buffer], { type: mimeType }), `upload.${guessFileExtension(mimeType)}`);
+
+  if (ingredients) {
+    formData.append('ingredients_text', ingredients);
+  }
+  if (portion) {
+    formData.append('portion_text', portion);
+  }
+  if (description) {
+    formData.append('description', description);
+  }
+
+  const pythonResponse = await fetch(PYTHON_VISION_URL, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const rawText = await pythonResponse.text();
+  if (!pythonResponse.ok) {
+    const error = new Error(`Python vision service failed with status ${pythonResponse.status}: ${rawText}`);
+    (error as Error & { status?: number }).status = 502;
+    throw error;
+  }
+
+  return JSON.parse(rawText) as PythonVisionResponseBody;
+}
 
 app.get('/api/health', (_request, response) => {
   response.json({
     status: 'ok',
     aiConfigured: Boolean(API_KEY),
+    reviewApiConfigured: Boolean(REVIEW_API_BASE_URL),
+    visionPythonConfigured: Boolean(PYTHON_VISION_URL),
   });
 });
 
@@ -268,43 +329,14 @@ app.post('/api/vision/analyze', async (request, response) => {
       return;
     }
 
-    const ingredientsText = body.ingredientsText?.trim() || 'Not provided';
-    const portionText = body.portionText?.trim() || 'Not provided';
-
-    const visionResult = await callAi<VisionResponseBody>({
-      model: VISION_MODEL,
-      schemaName: 'meal_analysis',
-      schema: visionSchema,
-      temperature: 0.1,
-      maxTokens: 700,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Estimate meal name, meal type, calories, protein, carbs, fat, portion estimate, and confidence from the meal photo. Return only structured data.',
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text:
-                `Meal photo.\n` +
-                `Ingredients hint: ${ingredientsText}\n` +
-                `Portion hint: ${portionText}`,
-            },
-            {
-              type: 'image_url',
-              image_url: { url: imageDataUrl },
-            },
-          ],
-        },
-      ],
-      reasoning: { effort: 'none', exclude: true },
+    const visionResult = await callPythonVisionService({
+      imageDataUrl,
+      ingredientsText: body.ingredientsText,
+      portionText: body.portionText,
     });
 
     response.json({
-      meal_name: visionResult.meal_name.trim() || 'Logged meal',
+      meal_name: visionResult.meal_name?.trim() || 'Logged meal',
       meal_type: visionResult.meal_type || 'Meal',
       calories: normalizeNumber(visionResult.calories),
       protein_g: normalizeNumber(visionResult.protein_g),
@@ -313,10 +345,10 @@ app.post('/api/vision/analyze', async (request, response) => {
       confidence: clampUnitInterval(visionResult.confidence, 0.72),
       predicted_portion_g:
         visionResult.predicted_portion_g == null ? null : normalizeNumber(visionResult.predicted_portion_g),
-      prompt_text: visionResult.prompt_text,
-      route: 'meal_photo_analysis',
-      ingredients_text: body.ingredientsText?.trim() || null,
-      portion_text: body.portionText?.trim() || null,
+      prompt_text: visionResult.prompt_text || 'Meal analysis completed.',
+      route: visionResult.route || 'python_vision_service',
+      ingredients_text: visionResult.ingredients_text ?? body.ingredientsText?.trim() ?? null,
+      portion_text: visionResult.portion_text ?? body.portionText?.trim() ?? null,
     });
   } catch (error) {
     const status = (error as Error & { status?: number }).status || 500;
@@ -326,6 +358,64 @@ app.post('/api/vision/analyze', async (request, response) => {
   }
 });
 
+function inferUserGroup(profileSummary: string) {
+  const text = profileSummary.toLowerCase();
+  if (text.includes('cognitive focus')) {
+    return 'Adult/Mental Health Risk';
+  }
+  if (text.includes('holistic vitality')) {
+    return 'Adult/Standard Health';
+  }
+  if (text.includes('athletic performance')) {
+    return 'Adult/Standard Health';
+  }
+  if (text.includes('optimize weight')) {
+    return 'Adult/Diabetes Risk';
+  }
+  return 'Adult/Standard Health';
+}
+
+function extractProfileField(profileSummary: string, field: string) {
+  const match = profileSummary.match(new RegExp(`^${field}:\\s*(.+)$`, 'im'));
+  return match?.[1]?.trim() || '';
+}
+
+function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
+  const profileSummary = body.profileSummary || '';
+  const age = extractProfileField(profileSummary, 'Age');
+  const weight = extractProfileField(profileSummary, 'Weight');
+  const height = extractProfileField(profileSummary, 'Height');
+  const goal = extractProfileField(profileSummary, 'Goal') || 'Maintenance';
+  const userGroup = inferUserGroup(profileSummary);
+  const conditions = userGroup.includes('Diabetes')
+    ? 'Diabetes'
+    : userGroup.includes('Mental Health')
+      ? 'Depression risk'
+      : 'None reported';
+
+  const meals = Array.isArray(body.meals) ? body.meals : [];
+  const mealLines = meals
+    .map((meal) => {
+      const mealName = meal.title || meal.mealType || 'Meal';
+      return `- ${mealName}: ${Math.round(meal.calories || 0)}cal | P:${Math.round(meal.protein_g || 0)}g | F:${Math.round(meal.fat_g || 0)}g | C:${Math.round(meal.carbs_g || 0)}g`;
+    })
+    .join('\n');
+
+  return [
+    `[USER GROUP: ${userGroup}]`,
+    `Age: ${age || '28'} | Gender: ${extractProfileField(profileSummary, 'Biological sex for BMR math') || 'Unknown'} | Weight: ${weight || 'Unknown'} | Height: ${height || 'Unknown'}`,
+    `Conditions: ${conditions}`,
+    '',
+    'Current Intake:',
+    `  Total:     ${Math.round(totals.calories)}cal | P:${Math.round(totals.protein)}g | F:${Math.round(totals.fat)}g | C:${Math.round(totals.carbs)}g`,
+    mealLines || '  No meals recorded',
+    '',
+    `Goal: ${goal}`,
+    `Targets:\n${body.goalsSummary || 'Not provided'}`,
+    'Request: Review today’s intake against the targets and provide practical diet advice only.',
+  ].join('\n');
+}
+
 app.post('/api/coach/daily-feedback', async (request, response) => {
   try {
     const body = request.body as CoachRequestBody;
@@ -333,9 +423,7 @@ app.post('/api/coach/daily-feedback', async (request, response) => {
 
     if (meals.length === 0) {
       response.json({
-        headline: 'Log a meal to unlock today’s review.',
-        summary: 'Once you confirm at least one meal, the coach will summarize what happened today and suggest the most important next move.',
-        next_action: 'Confirm your first meal to generate a daily review.',
+        advice: 'Log a meal to unlock today’s review.',
         generated_at: new Date().toISOString(),
         meal_count: 0,
       } satisfies CoachApiResponseBody);
@@ -352,39 +440,28 @@ app.post('/api/coach/daily-feedback', async (request, response) => {
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 },
     );
-
-    const coachResult = await callAi<CoachModelResponseBody>({
-      model: COACH_MODEL,
-      schemaName: 'daily_coach_feedback',
-      schema: coachSchema,
-      temperature: 0.2,
-      maxTokens: 1700,
-      reasoning: { effort: 'low', exclude: true },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Write a concise nutrition review from confirmed meals. Stay grounded, specific, supportive, and never invent metrics or patterns that are not present in the data. Return only structured data.',
-        },
-        {
-          role: 'user',
-          content:
-            `Create a short daily nutrition review for ${body.date || 'today'}.\n\n` +
-            `Profile context:\n${body.profileSummary || 'Not provided'}\n\n` +
-            `Nutrition targets:\n${body.goalsSummary || 'Not provided'}\n\n` +
-            `Daily totals:\n` +
-            `- Calories: ${normalizeNumber(totals.calories)} kcal\n` +
-            `- Protein: ${normalizeNumber(totals.protein)} g\n` +
-            `- Carbs: ${normalizeNumber(totals.carbs)} g\n` +
-            `- Fat: ${normalizeNumber(totals.fat)} g\n\n` +
-            `Meals:\n${JSON.stringify(meals, null, 2)}\n\n` +
-            'Return only three fields: a short headline, a plain-language summary of how the day compares to the targets, and one next action for the rest of today or tomorrow.',
-        },
-      ],
+    const reviewResponse = await fetch(`${REVIEW_API_BASE_URL}/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: buildReviewPrompt(body, totals),
+      }),
     });
 
+    const rawText = await reviewResponse.text();
+    if (!reviewResponse.ok) {
+      throw new Error(`The review API failed with status ${reviewResponse.status}: ${rawText}`);
+    }
+
+    const parsed = JSON.parse(rawText) as { advice?: string };
+    if (!parsed.advice?.trim()) {
+      throw new Error('The review API returned an empty response.');
+    }
+
     response.json({
-      ...coachResult,
+      advice: parsed.advice.trim(),
       generated_at: new Date().toISOString(),
       meal_count: meals.length,
     } satisfies CoachApiResponseBody);

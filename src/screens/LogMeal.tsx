@@ -113,9 +113,6 @@ export default function LogMeal({ onComplete, onMealLogged }: LogMealProps) {
     onComplete();
   };
 
-  const confidenceLabel = analysis?.confidence != null
-    ? `Confidence: ${Math.round(analysis.confidence * 100)}%`
-    : 'Confidence: --';
   const predictedPortionLabel = analysis?.predicted_portion_g != null
     ? `${analysis.predicted_portion_g.toFixed(1)} g estimated portion`
     : 'Portion estimate unavailable';
@@ -289,8 +286,7 @@ export default function LogMeal({ onComplete, onMealLogged }: LogMealProps) {
               </div>
               <div>
                 <h3 className="font-headline font-bold text-2xl text-zinc-900">AI Interpretation</h3>
-                <p className="text-sm text-zinc-400 font-medium">{confidenceLabel}</p>
-                <p className="text-xs text-zinc-400 font-medium mt-1">{predictedPortionLabel}</p>
+                <p className="text-sm text-zinc-400 font-medium">{predictedPortionLabel}</p>
               </div>
             </div>
 
@@ -332,14 +328,6 @@ export default function LogMeal({ onComplete, onMealLogged }: LogMealProps) {
                   bg: 'bg-zinc-50',
                   bar: 'bg-zinc-400',
                   w: `${clampPercent(analysis?.fat_g, 40)}%`,
-                },
-                {
-                  label: 'Confidence',
-                  val: analysis?.confidence != null ? `${Math.round(analysis.confidence * 100)}%` : '--',
-                  color: 'text-primary',
-                  bg: 'bg-emerald-50',
-                  bar: 'bg-primary',
-                  w: `${Math.round((analysis?.confidence || 0) * 100)}%`,
                 },
               ].map((macro) => (
                 <div key={macro.label} className={cn('rounded-2xl p-5 flex flex-col', macro.bg)}>

@@ -2,9 +2,7 @@ import { postJson } from './api';
 import type { LoggedMeal } from './meal-log';
 
 export interface DailyCoachFeedback {
-  headline: string;
-  summary: string;
-  next_action: string;
+  advice: string;
   generated_at: string;
   meal_count: number;
 }
