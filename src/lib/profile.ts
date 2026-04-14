@@ -2,7 +2,8 @@ export type BiologicalSex = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very' | 'extra';
 export type GoalDirection = 'lose' | 'maintain' | 'gain';
 export type WellnessObjective = 'weight' | 'performance' | 'vitality' | 'focus';
-export type DiagnosedCondition = 'diabetes' | 'depression' | 'sleep-issues' | 'none';
+export type DiagnosedCondition = 'diabetes-pre-diabetes' | 'depression-low-mood' | 'sleep-difficulties' | 'none';
+export type NutritionPlanPreference = 'one-day-meal-plan' | 'one-week-meal-plan' | 'recommended-targets' | 'intake-critique' | '';
 
 export interface UserProfile {
   name: string;
@@ -15,8 +16,8 @@ export interface UserProfile {
   targetWeightKg: number | null;
   targetDays: number | null;
   wellnessObjective: WellnessObjective;
-  diagnosedCondition: DiagnosedCondition;
-  nutritionPlanPreference: string;
+  diagnosedConditions: DiagnosedCondition[];
+  nutritionPlanPreference: NutritionPlanPreference;
 }
 
 export interface NutritionTargets {
@@ -47,7 +48,7 @@ export const defaultProfile: UserProfile = {
   targetWeightKg: null,
   targetDays: null,
   wellnessObjective: 'weight',
-  diagnosedCondition: 'none',
+  diagnosedConditions: ['none'],
   nutritionPlanPreference: '',
 };
 
@@ -81,11 +82,91 @@ const objectiveLabels: Record<WellnessObjective, string> = {
 };
 
 const diagnosedConditionLabels: Record<DiagnosedCondition, string> = {
-  diabetes: 'Diabetes',
-  depression: 'Depression',
-  'sleep-issues': 'Sleep Issues',
-  none: 'None',
+  'diabetes-pre-diabetes': 'Diabetes or pre-diabetes',
+  'depression-low-mood': 'Depression or low mood',
+  'sleep-difficulties': 'Sleep difficulties',
+  none: 'None of the above',
 };
+
+const nutritionPlanPreferenceLabels: Record<Exclude<NutritionPlanPreference, ''>, string> = {
+  'one-day-meal-plan': '1-Day Meal Plan',
+  'one-week-meal-plan': '1-Week Meal Plan',
+  'recommended-targets': 'Recommended Targets',
+  'intake-critique': 'Intake Critique',
+};
+
+function isDiagnosedCondition(value: unknown): value is DiagnosedCondition {
+  return value === 'diabetes-pre-diabetes'
+    || value === 'depression-low-mood'
+    || value === 'sleep-difficulties'
+    || value === 'none';
+}
+
+function isNutritionPlanPreference(value: unknown): value is Exclude<NutritionPlanPreference, ''> {
+  return value === 'one-day-meal-plan'
+    || value === 'one-week-meal-plan'
+    || value === 'recommended-targets'
+    || value === 'intake-critique';
+}
+
+function normalizeDiagnosedConditions(value: unknown): DiagnosedCondition[] {
+  if (Array.isArray(value)) {
+    const nextValues = value.filter(isDiagnosedCondition);
+    if (nextValues.includes('none')) {
+      return ['none'];
+    }
+    if (nextValues.length > 0) {
+      return nextValues;
+    }
+  }
+
+  if (typeof value === 'string') {
+    if (value === 'diabetes') {
+      return ['diabetes-pre-diabetes'];
+    }
+    if (value === 'depression') {
+      return ['depression-low-mood'];
+    }
+    if (value === 'sleep-issues') {
+      return ['sleep-difficulties'];
+    }
+    if (isDiagnosedCondition(value)) {
+      return [value];
+    }
+  }
+
+  return defaultProfile.diagnosedConditions;
+}
+
+function normalizeNutritionPlanPreference(value: unknown): NutritionPlanPreference {
+  if (value === '') {
+    return '';
+  }
+
+  if (isNutritionPlanPreference(value)) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return defaultProfile.nutritionPlanPreference;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized.includes('1-day')) {
+    return 'one-day-meal-plan';
+  }
+  if (normalized.includes('1-week')) {
+    return 'one-week-meal-plan';
+  }
+  if (normalized.includes('recommended')) {
+    return 'recommended-targets';
+  }
+  if (normalized.includes('intake')) {
+    return 'intake-critique';
+  }
+
+  return defaultProfile.nutritionPlanPreference;
+}
 
 const macroPercentagesByObjective: Record<
   WellnessObjective,
@@ -124,8 +205,16 @@ export function loadUserProfile() {
       return null;
     }
 
-    const parsed = JSON.parse(raw);
-    return { ...defaultProfile, ...parsed } as UserProfile;
+    const parsed = JSON.parse(raw) as Partial<UserProfile> & {
+      diagnosedCondition?: DiagnosedCondition | 'diabetes' | 'depression' | 'sleep-issues';
+    };
+
+    return {
+      ...defaultProfile,
+      ...parsed,
+      diagnosedConditions: normalizeDiagnosedConditions(parsed.diagnosedConditions ?? parsed.diagnosedCondition),
+      nutritionPlanPreference: normalizeNutritionPlanPreference(parsed.nutritionPlanPreference),
+    } as UserProfile;
   } catch {
     return null;
   }
@@ -224,6 +313,18 @@ export function getDiagnosedConditionLabel(condition: DiagnosedCondition) {
   return diagnosedConditionLabels[condition];
 }
 
+export function getDiagnosedConditionsLabel(conditions: DiagnosedCondition[]) {
+  return conditions.map((condition) => getDiagnosedConditionLabel(condition)).join(', ');
+}
+
+export function getNutritionPlanPreferenceLabel(preference: NutritionPlanPreference) {
+  if (!preference) {
+    return 'Not specified';
+  }
+
+  return nutritionPlanPreferenceLabels[preference];
+}
+
 export function buildProfileSummary(profile: UserProfile) {
   return [
     profile.name ? `Name: ${profile.name}` : null,
@@ -234,8 +335,8 @@ export function buildProfileSummary(profile: UserProfile) {
     `Activity level: ${getActivityLabel(profile.activityLevel)}`,
     `Goal: ${getGoalLabel(profile.goal)}`,
     `Primary objective: ${getObjectiveLabel(profile.wellnessObjective)}`,
-    `Diagnosed conditions: ${getDiagnosedConditionLabel(profile.diagnosedCondition)}`,
-    profile.nutritionPlanPreference.trim() ? `Nutrition plan type preference: ${profile.nutritionPlanPreference.trim()}` : null,
+    `Diagnosed conditions: ${getDiagnosedConditionsLabel(profile.diagnosedConditions)}`,
+    profile.nutritionPlanPreference ? `Nutrition plan type preference: ${getNutritionPlanPreferenceLabel(profile.nutritionPlanPreference)}` : null,
     profile.targetWeightKg ? `Target weight: ${profile.targetWeightKg} kg` : null,
     profile.targetDays ? `Target timeline: ${profile.targetDays} days` : null,
   ].filter(Boolean).join('\n');

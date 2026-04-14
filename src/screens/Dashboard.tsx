@@ -5,8 +5,9 @@ import { cn } from '../lib/utils';
 import { sumMeals, type LoggedMeal } from '../lib/meal-log';
 import {
   getActivityLabel,
-  getDiagnosedConditionLabel,
+  getDiagnosedConditionsLabel,
   getGoalLabel,
+  getNutritionPlanPreferenceLabel,
   getObjectiveLabel,
   type NutritionTargets,
   type UserProfile,
@@ -153,8 +154,8 @@ export default function Dashboard({
           <div className="space-y-5">
             <DetailRow label="Goal" value={getGoalLabel(profile.goal)} />
             <DetailRow label="Primary Objective" value={getObjectiveLabel(profile.wellnessObjective)} />
-            <DetailRow label="Diagnosed Conditions" value={getDiagnosedConditionLabel(profile.diagnosedCondition)} />
-            <DetailRow label="Plan Preference" value={profile.nutritionPlanPreference.trim() || 'Not specified'} />
+            <DetailRow label="Diagnosed Conditions" value={getDiagnosedConditionsLabel(profile.diagnosedConditions)} />
+            <DetailRow label="Plan Preference" value={getNutritionPlanPreferenceLabel(profile.nutritionPlanPreference)} />
             <DetailRow label="Activity Level" value={getActivityLabel(profile.activityLevel)} />
             <DetailRow label="BMR" value={`${nutritionTargets.bmr} kcal`} />
             <DetailRow label="TDEE" value={`${nutritionTargets.tdee} kcal`} />

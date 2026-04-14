@@ -11,6 +11,7 @@ import {
   type ActivityLevel,
   type DiagnosedCondition,
   type GoalDirection,
+  type NutritionPlanPreference,
   type UserProfile,
   type WellnessObjective,
 } from '../lib/profile';
@@ -35,12 +36,41 @@ const objectives: Array<{
 
 const activityOptions: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'very', 'extra'];
 const goalOptions: GoalDirection[] = ['lose', 'maintain', 'gain'];
-const diagnosedConditionOptions: DiagnosedCondition[] = ['diabetes', 'depression', 'sleep-issues', 'none'];
+const diagnosedConditionOptions: DiagnosedCondition[] = ['diabetes-pre-diabetes', 'depression-low-mood', 'sleep-difficulties', 'none'];
+const nutritionPlanPreferenceOptions: Array<{
+  id: Exclude<NutritionPlanPreference, ''>;
+  label: string;
+  sub: string;
+}> = [
+  { id: 'one-day-meal-plan', label: '1-Day Meal Plan', sub: 'Detailed calories and macros per meal for a single structured day.' },
+  { id: 'one-week-meal-plan', label: '1-Week Meal Plan', sub: 'Daily calorie and macro targets spread across 7 varied days.' },
+  { id: 'recommended-targets', label: 'Recommended Targets', sub: 'Just daily calorie and macro goals. No specific meals suggested.' },
+  { id: 'intake-critique', label: 'Intake Critique', sub: 'Critique current intake and recommend specific adjustments.' },
+];
 
 export default function Onboarding({ initialProfile, onComplete }: OnboardingProps) {
   const [profile, setProfile] = useState<UserProfile>(initialProfile ?? defaultProfile);
   const targets = useMemo(() => calculateNutritionTargets(profile), [profile]);
   const canSubmit = profile.name.trim().length > 0;
+
+  const toggleDiagnosedCondition = (condition: DiagnosedCondition) => {
+    setProfile((current) => {
+      if (condition === 'none') {
+        return { ...current, diagnosedConditions: ['none'] };
+      }
+
+      const withoutNone = current.diagnosedConditions.filter((value) => value !== 'none');
+      const isSelected = withoutNone.includes(condition);
+      const nextValues = isSelected
+        ? withoutNone.filter((value) => value !== condition)
+        : [...withoutNone, condition];
+
+      return {
+        ...current,
+        diagnosedConditions: nextValues.length > 0 ? nextValues : ['none'],
+      };
+    });
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -258,14 +288,24 @@ export default function Onboarding({ initialProfile, onComplete }: OnboardingPro
                     <button
                       key={condition}
                       type="button"
-                      onClick={() => setProfile((current) => ({ ...current, diagnosedCondition: condition }))}
+                      onClick={() => toggleDiagnosedCondition(condition)}
                       className={cn(
-                        'rounded-2xl border px-4 py-4 text-left transition-all min-h-[88px] flex items-center',
-                        profile.diagnosedCondition === condition
+                        'rounded-2xl border px-4 py-4 text-left transition-all min-h-[88px] flex items-center gap-3',
+                        profile.diagnosedConditions.includes(condition)
                           ? 'border-primary bg-emerald-50 text-zinc-900 shadow-sm'
                           : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300',
                       )}
                     >
+                      <span
+                        className={cn(
+                          'h-5 w-5 rounded-md border flex items-center justify-center shrink-0',
+                          profile.diagnosedConditions.includes(condition)
+                            ? 'border-primary bg-primary text-white'
+                            : 'border-zinc-300 bg-white',
+                        )}
+                      >
+                        {profile.diagnosedConditions.includes(condition) ? <Check className="w-3 h-3" /> : null}
+                      </span>
                       <span className="block font-bold text-zinc-900 leading-snug">{getDiagnosedConditionLabel(condition)}</span>
                     </button>
                   ))}
@@ -273,17 +313,28 @@ export default function Onboarding({ initialProfile, onComplete }: OnboardingPro
               </Field>
 
               <Field label="Nutrition Plan Type Preference" icon={ClipboardPenLine}>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Balanced, Mediterranean, high-protein..."
-                    value={profile.nutritionPlanPreference}
-                    onChange={(event) => setProfile((current) => ({ ...current, nutritionPlanPreference: event.target.value }))}
-                    className="w-full bg-zinc-50 border-none rounded-xl p-4 text-zinc-900 focus:ring-2 focus:ring-primary transition-all"
-                  />
-                  <p className="text-sm text-zinc-500 leading-relaxed">
-                    Save the plan style they prefer so coaching can stay aligned with it.
-                  </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {nutritionPlanPreferenceOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setProfile((current) => ({ ...current, nutritionPlanPreference: option.id }))}
+                      className={cn(
+                        'group relative flex flex-col rounded-2xl border p-5 text-left transition-all min-h-[152px]',
+                        profile.nutritionPlanPreference === option.id
+                          ? 'border-primary bg-emerald-50 shadow-sm'
+                          : 'border-zinc-200 bg-white hover:border-zinc-300',
+                      )}
+                    >
+                      <span className="font-headline font-bold text-zinc-900">{option.label}</span>
+                      <span className="mt-2 text-sm leading-relaxed text-zinc-500">{option.sub}</span>
+                      {profile.nutritionPlanPreference === option.id ? (
+                        <div className="absolute top-4 right-4 h-5 w-5 rounded-full bg-primary text-white flex items-center justify-center">
+                          <Check className="w-3 h-3" />
+                        </div>
+                      ) : null}
+                    </button>
+                  ))}
                 </div>
               </Field>
             </div>

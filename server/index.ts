@@ -366,7 +366,7 @@ function inferUserGroup(profileSummary: string) {
   if (diagnosedConditions.includes('depression')) {
     return 'Adult/Mental Health Risk';
   }
-  if (diagnosedConditions.includes('sleep issues')) {
+  if (diagnosedConditions.includes('sleep difficulties')) {
     return 'Adult/Sleep Risk';
   }
 
@@ -406,7 +406,7 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
       : userGroup.includes('Mental Health')
         ? 'Depression risk'
         : userGroup.includes('Sleep')
-          ? 'Sleep issues'
+          ? 'Sleep difficulties'
           : 'None reported'
   );
 
