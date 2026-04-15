@@ -45,6 +45,20 @@ export default function App() {
     setCurrentScreen('dashboard');
   };
 
+  const handleMealDeleted = (mealId: string) => {
+    const mealToDelete = loggedMeals.find((meal) => meal.id === mealId);
+    if (!mealToDelete) {
+      return;
+    }
+
+    const shouldDelete = globalThis.confirm(`Delete "${mealToDelete.title}" from your confirmed meals?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setLoggedMeals((currentMeals) => currentMeals.filter((meal) => meal.id !== mealId));
+  };
+
   const handleProfileSaved = (nextProfile: UserProfile) => {
     setProfile(nextProfile);
     setCurrentScreen('dashboard');
@@ -66,6 +80,7 @@ export default function App() {
             nutritionTargets={nutritionTargets}
             onLogMeal={() => setCurrentScreen('logs')}
             onEditProfile={() => setCurrentScreen('onboarding')}
+            onDeleteMeal={handleMealDeleted}
           />
         );
       case 'logs':
@@ -80,6 +95,7 @@ export default function App() {
             nutritionTargets={nutritionTargets}
             onLogMeal={() => setCurrentScreen('logs')}
             onEditProfile={() => setCurrentScreen('onboarding')}
+            onDeleteMeal={handleMealDeleted}
           />
         );
     }

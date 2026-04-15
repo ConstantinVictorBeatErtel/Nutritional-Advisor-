@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Plus, Settings2, ClipboardList } from 'lucide-react';
+import { Plus, Settings2, ClipboardList, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { sumMeals, type LoggedMeal } from '../lib/meal-log';
 import {
@@ -19,6 +19,7 @@ interface DashboardProps {
   nutritionTargets: NutritionTargets;
   onLogMeal: () => void;
   onEditProfile: () => void;
+  onDeleteMeal: (mealId: string) => void;
 }
 
 function formatPercent(current: number, target: number) {
@@ -41,6 +42,7 @@ export default function Dashboard({
   nutritionTargets,
   onLogMeal,
   onEditProfile,
+  onDeleteMeal,
 }: DashboardProps) {
   const totals = sumMeals(meals);
   const remainingCalories = Math.max(0, nutritionTargets.targetCalories - Math.round(totals.calories));
@@ -201,6 +203,14 @@ export default function Dashboard({
                     <Stat label="Carbs" value={`${Math.round(meal.carbs_g)}g`} />
                     <Stat label="Fat" value={`${Math.round(meal.fat_g)}g`} />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteMeal(meal.id)}
+                    className="self-start rounded-xl p-2 text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    aria-label={`Delete ${meal.title}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               ))}
             </div>
