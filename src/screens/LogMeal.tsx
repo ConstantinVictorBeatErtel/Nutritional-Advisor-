@@ -24,9 +24,17 @@ function formatMacro(value?: number) {
   return Number.isFinite(value) ? `${value!.toFixed(1)}g` : '--';
 }
 
+function createMealId() {
+  if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 function buildLoggedMeal(analysis: VisionAnalysisResult, ingredientsText: string, portionText: string): LoggedMeal {
   return {
-    id: crypto.randomUUID(),
+    id: createMealId(),
     title: analysis.meal_name || 'Logged meal',
     mealType: analysis.meal_type || 'Meal',
     createdAt: new Date().toISOString(),

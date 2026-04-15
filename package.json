@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "dev:api": "tsx server/index.ts",
+    "dev:vision": "python3 server/vision_runtime/vision_api_server.py --host 127.0.0.1 --port 8010 --release-dir server/vision_runtime",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
@@ -22,6 +23,7 @@
     "motion": "^12.23.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
     "vite": "^6.2.0"
