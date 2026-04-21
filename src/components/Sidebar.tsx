@@ -18,7 +18,7 @@ export default function Sidebar({ activeTab, setActiveTab, userName }: SidebarPr
   return (
     <aside className="hidden md:flex flex-col h-screen w-64 bg-emerald-50/80 backdrop-blur-xl py-8 px-4 sticky top-0 border-r border-emerald-100/20">
       <div className="mb-12 px-2">
-        <h1 className="text-xl font-bold tracking-tighter text-emerald-900">Vitality Advisor</h1>
+        <h1 className="text-xl font-bold tracking-tighter text-emerald-900">NutriSnap</h1>
         <p className="text-[10px] text-emerald-600/70 uppercase tracking-widest font-bold mt-1">Personal Nutrition</p>
       </div>
 

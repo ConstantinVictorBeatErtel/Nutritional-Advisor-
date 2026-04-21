@@ -104,7 +104,7 @@ export default function Onboarding({ initialProfile, onComplete }: OnboardingPro
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-8">
               <Leaf className="w-8 h-8 fill-white" />
-              <span className="font-headline font-extrabold tracking-tighter text-2xl">The Vitality Edit</span>
+              <span className="font-headline font-extrabold tracking-tighter text-2xl">NutriSnap</span>
             </div>
             <h1 className="font-headline text-5xl font-extrabold leading-[1.1] mb-6 tracking-tight">
               Nutrition targets that actually match your profile.
