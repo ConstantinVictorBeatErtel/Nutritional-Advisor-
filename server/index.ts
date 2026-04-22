@@ -458,7 +458,9 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
     '',
     `Goal: ${goal}`,
     `Targets:\n${body.goalsSummary || 'Not provided'}`,
-    'Request: Review today’s intake against the targets, account for the diagnosed conditions and user group, and follow the selected nutrition plan style.',
+    meals.length === 0
+      ? 'Request: No meals are logged yet today. Using the profile, conditions, nutrition plan preference, and targets above, give concrete guidance: how to plan the day, example meals with approximate calories and macros, and priorities to reach the targets. Do not invent foods as if they were logged.'
+      : 'Request: Review today’s intake against the targets, account for the diagnosed conditions and user group, and follow the selected nutrition plan style.',
   ].join('\n');
 }
 
@@ -466,15 +468,6 @@ app.post('/api/coach/daily-feedback', async (request, response) => {
   try {
     const body = request.body as CoachRequestBody;
     const meals = Array.isArray(body.meals) ? body.meals : [];
-
-    if (meals.length === 0) {
-      response.json({
-        advice: 'Log a meal to unlock today’s review.',
-        generated_at: new Date().toISOString(),
-        meal_count: 0,
-      } satisfies CoachApiResponseBody);
-      return;
-    }
 
     const totals = meals.reduce<NutritionTotals>(
       (accumulator, meal) => {

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "start:local": "bash scripts/start-local-stack.sh",
     "dev:api": "tsx server/index.ts",
     "build": "vite build",
     "preview": "vite preview",

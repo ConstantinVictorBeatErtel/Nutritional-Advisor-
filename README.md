@@ -12,15 +12,37 @@ This version uses a local Express API for meal-photo analysis and daily coaching
 
 ## Run Locally
 
-1. Install dependencies:
-   `npm install`
-2. Create `.env.local`:
+### One command: full local stack (vision + review LLM + API + web)
+
+This app uses **two local Python services**: Vitality vision (meal photo) on port **8010**, and the nutrition review model (FastAPI) on port **8000**. The Express server already points at those defaults (`VISION_PYTHON_URL` / `AI_REVIEW_API_BASE_URL`).
+
+1. Install Node dependencies: `npm install`
+2. Copy `scripts/local-paths.env.example` to `scripts/local-paths.env` if your folders are not the defaults inside that file.
+3. Ensure the review API venv has its dependencies (Unsloth, FastAPI, etc.); set `REVIEW_PYTHON` / `VISION_PYTHON` in `scripts/local-paths.env` if you use project-specific interpreters (for example the frozen bundle’s `.venv311arm2`).
+4. Run everything:
 
    ```bash
-   AI_API_KEY="sk-or-v1-..."
-   AI_HTTP_REFERER="http://127.0.0.1:3000"
-   AI_APP_TITLE="Nutritional Advisor"
+   npm run start:local
+   ```
+
+   On macOS you can also double-click **`Start Local Stack.command`** in Finder.
+
+5. Open `http://127.0.0.1:3000`. **No OpenRouter key is required** for the daily coach when the review service is running.
+
+### Apple Silicon notes
+
+- **Vision:** If the full RAMRL bundle is missing `phase1_encoder_nb_e3.pt` and/or `faiss_new.index`, the runtime automatically uses a **local CLIP prototype estimator** (OpenAI CLIP + curated food macros + your optional text hints). Weights download from Hugging Face on first use if the `vendor_models/...` tree has no checkpoint files. CLIP and the phase-1 fusion model run on **MPS** when available (`deploy_runtime.get_device`).
+- **Review:** Default `REVIEW_MODE=mps` runs `scripts/review_mps_server.py` (**Qwen2.5-0.5B-Instruct** on MPS). Override with `NUTRITION_REVIEW_MODEL`. CUDA/Unsloth remains available as `REVIEW_MODE=full`.
+
+### Manual run (API + web only, you start Python yourself)
+
+1. Install dependencies:
+   `npm install`
+2. Create `.env.local` if needed:
+
+   ```bash
    AI_REVIEW_API_BASE_URL="http://127.0.0.1:8000"
+   VISION_PYTHON_URL="http://127.0.0.1:8010/api/vision/analyze"
    VITE_APP_API_BASE_URL="http://127.0.0.1:8787"
    ```
 

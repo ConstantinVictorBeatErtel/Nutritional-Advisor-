@@ -18,7 +18,7 @@ interface CoachProps {
 }
 
 const FALLBACK_FEEDBACK: DailyCoachFeedback = {
-  advice: 'Log a meal to unlock today’s review.',
+  advice: 'Loading your review…',
   generated_at: new Date().toISOString(),
   meal_count: 0,
 };
@@ -46,12 +46,6 @@ export default function Coach({ meals, profile, nutritionTargets }: CoachProps) 
   const totals = useMemo(() => sumMeals(meals), [meals]);
 
   const loadFeedback = async () => {
-    if (meals.length === 0) {
-      setFeedback(FALLBACK_FEEDBACK);
-      setErrorMessage(null);
-      return;
-    }
-
     try {
       setIsLoading(true);
       setErrorMessage(null);
