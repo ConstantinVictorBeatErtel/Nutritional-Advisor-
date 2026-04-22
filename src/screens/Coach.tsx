@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { BrainCircuit, LoaderCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { BrainCircuit, LoaderCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { getDailyCoachFeedback, type DailyCoachFeedback } from '../lib/coach';
-import { sumMeals, type LoggedMeal } from '../lib/meal-log';
+import { sumMeals, todayLocalDateKey, type LoggedMeal } from '../lib/meal-log';
 import {
   buildGoalsSummary,
   buildProfileSummary,
@@ -15,6 +15,7 @@ interface CoachProps {
   meals: LoggedMeal[];
   profile: UserProfile;
   nutritionTargets: NutritionTargets;
+  onRemoveMeal: (mealId: string) => void;
 }
 
 const FALLBACK_FEEDBACK: DailyCoachFeedback = {
@@ -39,7 +40,7 @@ function splitAdvice(advice: string) {
     .filter(Boolean);
 }
 
-export default function Coach({ meals, profile, nutritionTargets }: CoachProps) {
+export default function Coach({ meals, profile, nutritionTargets, onRemoveMeal }: CoachProps) {
   const [feedback, setFeedback] = useState<DailyCoachFeedback>(FALLBACK_FEEDBACK);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export default function Coach({ meals, profile, nutritionTargets }: CoachProps) 
       setErrorMessage(null);
       const nextFeedback = await getDailyCoachFeedback(
         meals,
-        new Date().toISOString().slice(0, 10),
+        todayLocalDateKey(),
         buildGoalsSummary(nutritionTargets),
         buildProfileSummary(profile),
       );
@@ -83,7 +84,7 @@ export default function Coach({ meals, profile, nutritionTargets }: CoachProps) 
             Today&apos;s <span className="text-primary italic">Review</span>
           </h2>
           <p className="mt-4 text-zinc-500 max-w-2xl leading-relaxed">
-            This review comes from the attached nutrition review API using your confirmed meals, saved profile, and calculated targets.
+            This review uses today&apos;s confirmed meals (your local calendar date), your profile, and calculated targets.
           </p>
         </div>
 
@@ -151,13 +152,27 @@ export default function Coach({ meals, profile, nutritionTargets }: CoachProps) 
               {meals.map((meal) => (
                 <div key={meal.id} className="rounded-2xl bg-zinc-50 px-5 py-4 border border-zinc-100">
                   <div className="flex justify-between gap-4">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="font-bold text-zinc-900">{meal.title}</p>
                       <p className="text-sm text-zinc-500">
                         {meal.mealType} • {new Date(meal.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                       </p>
                     </div>
-                    <p className="font-bold text-zinc-900">{Math.round(meal.calories)} kcal</p>
+                    <div className="flex items-start gap-2 shrink-0">
+                      <p className="font-bold text-zinc-900">{Math.round(meal.calories)} kcal</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('Remove this meal from today’s log?')) {
+                            onRemoveMeal(meal.id);
+                          }
+                        }}
+                        className="p-2 rounded-xl text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        aria-label={`Remove ${meal.title}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   {(meal.ingredientsText || meal.portionText) ? (
                     <p className="mt-2 text-sm text-zinc-500">{[meal.ingredientsText, meal.portionText].filter(Boolean).join(' • ')}</p>

@@ -11,7 +11,15 @@ import Onboarding from './screens/Onboarding';
 import Dashboard from './screens/Dashboard';
 import Coach from './screens/Coach';
 import LogMeal from './screens/LogMeal';
-import { loadLoggedMeals, saveLoggedMeals, type LoggedMeal } from './lib/meal-log';
+import {
+  loadLoggedMeals,
+  saveLoggedMeals,
+  filterMealsForLocalDate,
+  todayLocalDateKey,
+  removeMealById,
+  MAX_LOGGED_MEALS,
+  type LoggedMeal,
+} from './lib/meal-log';
 import {
   calculateNutritionTargets,
   loadUserProfile,
@@ -29,6 +37,10 @@ export default function App() {
   });
   const [loggedMeals, setLoggedMeals] = useState<LoggedMeal[]>(() => loadLoggedMeals());
   const nutritionTargets = useMemo(() => (profile ? calculateNutritionTargets(profile) : null), [profile]);
+  const mealsToday = useMemo(
+    () => filterMealsForLocalDate(loggedMeals, todayLocalDateKey()),
+    [loggedMeals],
+  );
 
   useEffect(() => {
     saveLoggedMeals(loggedMeals);
@@ -41,8 +53,12 @@ export default function App() {
   }, [profile]);
 
   const handleMealLogged = (meal: LoggedMeal) => {
-    setLoggedMeals((currentMeals) => [meal, ...currentMeals].slice(0, 20));
+    setLoggedMeals((currentMeals) => [meal, ...currentMeals].slice(0, MAX_LOGGED_MEALS));
     setCurrentScreen('dashboard');
+  };
+
+  const handleRemoveMeal = (mealId: string) => {
+    setLoggedMeals((currentMeals) => removeMealById(currentMeals, mealId));
   };
 
   const handleProfileSaved = (nextProfile: UserProfile) => {
@@ -61,25 +77,34 @@ export default function App() {
       case 'dashboard':
         return (
           <Dashboard
-            meals={loggedMeals}
+            meals={mealsToday}
             profile={profile}
             nutritionTargets={nutritionTargets}
             onLogMeal={() => setCurrentScreen('logs')}
             onEditProfile={() => setCurrentScreen('onboarding')}
+            onRemoveMeal={handleRemoveMeal}
           />
         );
       case 'logs':
         return <LogMeal onComplete={() => setCurrentScreen('dashboard')} onMealLogged={handleMealLogged} />;
       case 'coach':
-        return <Coach meals={loggedMeals} profile={profile} nutritionTargets={nutritionTargets} />;
+        return (
+          <Coach
+            meals={mealsToday}
+            profile={profile}
+            nutritionTargets={nutritionTargets}
+            onRemoveMeal={handleRemoveMeal}
+          />
+        );
       default:
         return (
           <Dashboard
-            meals={loggedMeals}
+            meals={mealsToday}
             profile={profile}
             nutritionTargets={nutritionTargets}
             onLogMeal={() => setCurrentScreen('logs')}
             onEditProfile={() => setCurrentScreen('onboarding')}
+            onRemoveMeal={handleRemoveMeal}
           />
         );
     }

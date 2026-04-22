@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Plus, Settings2, ClipboardList } from 'lucide-react';
+import { Plus, Settings2, ClipboardList, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { sumMeals, type LoggedMeal } from '../lib/meal-log';
 import {
@@ -19,6 +19,7 @@ interface DashboardProps {
   nutritionTargets: NutritionTargets;
   onLogMeal: () => void;
   onEditProfile: () => void;
+  onRemoveMeal: (mealId: string) => void;
 }
 
 function formatPercent(current: number, target: number) {
@@ -41,9 +42,15 @@ export default function Dashboard({
   nutritionTargets,
   onLogMeal,
   onEditProfile,
+  onRemoveMeal,
 }: DashboardProps) {
   const totals = sumMeals(meals);
   const remainingCalories = Math.max(0, nutritionTargets.targetCalories - Math.round(totals.calories));
+  const todayHeading = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
 
   const macroCards = [
     {
@@ -86,9 +93,10 @@ export default function Dashboard({
             <span className="text-primary">Targets</span>
           </h2>
           <p className="text-zinc-500 max-w-2xl text-lg leading-relaxed">
+            <span className="font-semibold text-zinc-700">{todayHeading}.</span>{' '}
             {meals.length > 0
-              ? `You've logged ${meals.length} meal${meals.length === 1 ? '' : 's'} today. Your totals and coach review now update from confirmed meals only.`
-              : 'Start by logging a meal photo. The dashboard and daily coach update only from confirmed meals.'}
+              ? `You've logged ${meals.length} meal${meals.length === 1 ? '' : 's'} today (older days stay saved but are hidden here). Totals and the coach use only today’s entries.`
+              : 'No meals logged yet today. Log a meal photo to build today’s totals; past days remain in storage for history.'}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -171,8 +179,8 @@ export default function Dashboard({
         <section className="xl:col-span-12 bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Confirmed Meals</h3>
-              <p className="mt-2 text-sm text-zinc-500">Only meals you confirm in the logger appear here.</p>
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Today&apos;s meals</h3>
+              <p className="mt-2 text-sm text-zinc-500">Confirmed today only. Remove a row to delete it from your log.</p>
             </div>
             <ClipboardList className="w-5 h-5 text-zinc-300" />
           </div>
@@ -184,7 +192,7 @@ export default function Dashboard({
                   <div className="w-14 h-14 rounded-2xl bg-white border border-zinc-100 flex items-center justify-center shrink-0">
                     <span className="text-lg font-bold text-primary">{meal.title.slice(0, 1).toUpperCase()}</span>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <h4 className="font-bold text-zinc-900">{meal.title}</h4>
                     <p className="text-sm text-zinc-500">
                       {meal.mealType} • {new Date(meal.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -195,12 +203,24 @@ export default function Dashboard({
                       </p>
                     ) : null}
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-zinc-600">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-zinc-600 md:flex-1">
                     <Stat label="Calories" value={`${Math.round(meal.calories)} kcal`} />
                     <Stat label="Protein" value={`${Math.round(meal.protein_g)}g`} />
                     <Stat label="Carbs" value={`${Math.round(meal.carbs_g)}g`} />
                     <Stat label="Fat" value={`${Math.round(meal.fat_g)}g`} />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Remove this meal from your log?')) {
+                        onRemoveMeal(meal.id);
+                      }
+                    }}
+                    className="self-end md:self-center p-3 rounded-2xl text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                    aria-label={`Remove ${meal.title}`}
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
               ))}
             </div>

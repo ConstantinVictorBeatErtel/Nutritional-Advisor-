@@ -15,6 +15,40 @@ export interface LoggedMeal {
 
 const STORAGE_KEY = 'nutritional-advisor.logged-meals.v1';
 
+/** Cap stored entries so localStorage stays bounded (multi-day history). */
+export const MAX_LOGGED_MEALS = 500;
+
+/** Calendar date in the user's local timezone (YYYY-MM-DD). */
+export function localDateKeyFromIso(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return '';
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function todayLocalDateKey(): string {
+  const n = new Date();
+  const y = n.getFullYear();
+  const m = String(n.getMonth() + 1).padStart(2, '0');
+  const day = String(n.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function filterMealsForLocalDate(meals: LoggedMeal[], ymd: string): LoggedMeal[] {
+  if (!ymd) {
+    return [];
+  }
+  return meals.filter((meal) => localDateKeyFromIso(meal.createdAt) === ymd);
+}
+
+export function removeMealById(meals: LoggedMeal[], id: string): LoggedMeal[] {
+  return meals.filter((meal) => meal.id !== id);
+}
+
 export function loadLoggedMeals(): LoggedMeal[] {
   if (typeof window === 'undefined') {
     return [];

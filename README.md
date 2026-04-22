@@ -29,6 +29,26 @@ This app uses **two local Python services**: Vitality vision (meal photo) on por
 
 5. Open `http://127.0.0.1:3000`. **No OpenRouter key is required** for the daily coach when the review service is running.
 
+**Single terminal line** (from anywhere, adjust the `cd` path if your clone lives elsewhere):
+
+```bash
+cd "/Users/ConstiX/Downloads/Nutritional Advisor" && npm run start:local
+```
+
+### Faster review model (same stack: PyTorch + MPS + Hugging Face)
+
+You keep the same architecture (small instruct LM on Apple GPU). Typical levers:
+
+- Set **`NUTRITION_REVIEW_FAST=1`** — uses a **tip-only** system prompt, a short output contract on the user message, **low-temperature sampling** (not greedy, so the model is less likely to parrot calorie lines), a **~220 token** cap by default (`NUTRITION_REVIEW_FAST_MAX_NEW`), and light post-processing to drop echoed intake rows.
+- Lower **`NUTRITION_REVIEW_MAX_NEW_TOKENS`** for non-fast mode, or **`NUTRITION_REVIEW_MAX_INPUT_TOKENS`** to trim long prompts.
+- Point **`NUTRITION_REVIEW_MODEL`** at a smaller instruct model if you accept different quality.
+
+Example:
+
+```bash
+cd "/Users/ConstiX/Downloads/Nutritional Advisor" && NUTRITION_REVIEW_FAST=1 npm run start:local
+```
+
 ### Apple Silicon notes
 
 - **Vision:** If the full RAMRL bundle is missing `phase1_encoder_nb_e3.pt` and/or `faiss_new.index`, the runtime automatically uses a **local CLIP prototype estimator** (OpenAI CLIP + curated food macros + your optional text hints). Weights download from Hugging Face on first use if the `vendor_models/...` tree has no checkpoint files. CLIP and the phase-1 fusion model run on **MPS** when available (`deploy_runtime.get_device`).
