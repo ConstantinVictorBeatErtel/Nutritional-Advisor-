@@ -482,15 +482,31 @@ app.post('/api/coach/daily-feedback', async (request, response) => {
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 },
     );
-    const reviewResponse = await fetch(`${REVIEW_API_BASE_URL}/analyze`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt: buildReviewPrompt(body, totals),
-      }),
-    });
+    let reviewResponse: Response;
+    try {
+      reviewResponse = await fetch(`${REVIEW_API_BASE_URL}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: buildReviewPrompt(body, totals),
+        }),
+      });
+    } catch (fetchError) {
+      const reason = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      const isNetwork =
+        reason === 'fetch failed' ||
+        (fetchError instanceof TypeError && /fetch|network|ECONNREFUSED|ENOTFOUND|certificate/i.test(reason));
+      if (isNetwork) {
+        throw new Error(
+          `Could not reach the review API at ${REVIEW_API_BASE_URL}/analyze (${reason}). ` +
+            'If this was a Colab Cloudflare URL, it expires when the notebook stops—open API_Calling.ipynb, start a new tunnel, and set AI_REVIEW_API_BASE_URL in .env.local to the new base URL (no trailing slash). ' +
+            'For local coaching, run the review server on port 8000 (e.g. `npm run start:local` or `python scripts/review_mps_server.py`) and use AI_REVIEW_API_BASE_URL=http://127.0.0.1:8000.',
+        );
+      }
+      throw fetchError;
+    }
 
     const rawText = await reviewResponse.text();
     if (!reviewResponse.ok) {
