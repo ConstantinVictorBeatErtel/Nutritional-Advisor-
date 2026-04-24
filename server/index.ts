@@ -329,11 +329,34 @@ app.post('/api/vision/analyze', async (request, response) => {
       return;
     }
 
-    const visionResult = await callPythonVisionService({
-      imageDataUrl,
-      ingredientsText: body.ingredientsText,
-      portionText: body.portionText,
+    const ingredients = body.ingredientsText?.trim() || '';
+    const portion = body.portionText?.trim() || '';
+
+    const userText = [
+      'Analyse this meal photo and return nutritional estimates.',
+      ingredients && `Ingredients: ${ingredients}`,
+      portion && `Portion size: ${portion}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const visionResult = await callAi<PythonVisionResponseBody>({
+      model: 'google/gemini-2.0-flash-lite-001',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+            { type: 'text', text: userText },
+          ],
+        },
+      ],
+      schemaName: 'vision_result',
+      schema: visionSchema,
+      temperature: 0.2,
+      maxTokens: 700,
     });
+
 
     response.json({
       meal_name: visionResult.meal_name?.trim() || 'Logged meal',
@@ -364,8 +387,7 @@ function inferUserGroup(profileSummary: string) {
   const hasDiabetes = diagnosedConditions.includes('diabetes');
   const hasDepression = diagnosedConditions.includes('depression') || diagnosedConditions.includes('low mood');
   const hasSleep = diagnosedConditions.includes('sleep');
-  const hasNone =
-    diagnosedConditions.includes('none of the above') || diagnosedConditions.includes('none reported');
+  const hasNone = diagnosedConditions.includes('none of the above') || diagnosedConditions.includes('none reported');
 
   if (hasNone) {
     return 'Adult/Standard Health';
@@ -395,90 +417,6 @@ function extractProfileField(profileSummary: string, field: string) {
   return match?.[1]?.trim() || '';
 }
 
-function normalizeAdviceFromReview(value: unknown): string | null {
-  if (value == null) {
-    return null;
-  }
-  if (typeof value === 'string') {
-    const t = value.trim();
-    return t.length > 0 ? t : null;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    const t = String(value).trim();
-    return t.length > 0 ? t : null;
-  }
-  if (Array.isArray(value)) {
-    const t = value.map((v) => (typeof v === 'string' ? v : JSON.stringify(v))).join('\n').trim();
-    return t.length > 0 ? t : null;
-  }
-  return null;
-}
-
-function extractAdviceFromReviewPayload(parsed: unknown): string | null {
-  if (!parsed || typeof parsed !== 'object') {
-    return null;
-  }
-  const record = parsed as Record<string, unknown>;
-  const keys = ['advice', 'Advice', 'message', 'response', 'output', 'text', 'content'];
-  for (const key of keys) {
-    if (key in record) {
-      const normalized = normalizeAdviceFromReview(record[key]);
-      if (normalized) {
-        return normalized;
-      }
-    }
-  }
-  return null;
-}
-
-/** Review services should return JSON `{ "advice": "..." }`; tolerate fences, extra text, and plain-text fallbacks. */
-function parseReviewApiJsonBody(rawText: string): { advice: string } {
-  const trimmed = rawText.replace(/^\uFEFF/, '').trim();
-  if (!trimmed) {
-    throw new Error('The review API returned an empty body.');
-  }
-
-  const tryParse = (jsonStr: string): unknown => {
-    try {
-      return JSON.parse(jsonStr);
-    } catch {
-      return null;
-    }
-  };
-
-  let parsed: unknown = tryParse(trimmed);
-
-  if (parsed == null) {
-    const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fence) {
-      parsed = tryParse(fence[1].trim());
-    }
-  }
-
-  if (parsed == null) {
-    const first = trimmed.indexOf('{');
-    const last = trimmed.lastIndexOf('}');
-    if (first >= 0 && last > first) {
-      parsed = tryParse(trimmed.slice(first, last + 1));
-    }
-  }
-
-  if (parsed == null) {
-    if (!trimmed.startsWith('<')) {
-      return { advice: trimmed };
-    }
-    throw new Error(`The review API returned non-JSON. First 200 chars: ${trimmed.slice(0, 200)}`);
-  }
-
-  const advice = extractAdviceFromReviewPayload(parsed);
-  if (!advice) {
-    throw new Error(
-      `The review API JSON had no usable advice field. Snippet: ${trimmed.slice(0, 320)}`,
-    );
-  }
-  return { advice };
-}
-
 function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
   const profileSummary = body.profileSummary || '';
   const age = extractProfileField(profileSummary, 'Age');
@@ -488,15 +426,15 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
   const diagnosedConditions = extractProfileField(profileSummary, 'Diagnosed conditions');
   const nutritionPlanPreference = extractProfileField(profileSummary, 'Nutrition plan type preference');
   const userGroup = inferUserGroup(profileSummary);
-  const conditions =
-    diagnosedConditions ||
-    (userGroup.includes('Diabetes')
+  const conditions = diagnosedConditions || (
+    userGroup.includes('Diabetes')
       ? 'Diabetes'
       : userGroup.includes('Mental Health')
         ? 'Depression risk'
         : userGroup.includes('Sleep')
           ? 'Sleep difficulties'
-          : 'None reported');
+          : 'None reported'
+  );
 
   const meals = Array.isArray(body.meals) ? body.meals : [];
   const mealLines = meals
@@ -506,7 +444,10 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
     })
     .join('\n');
 
-  const pref = nutritionPlanPreference?.toLowerCase() ?? '';
+  console.log('=== PROFILE SUMMARY ===', body.profileSummary);
+  console.log('=== DIAGNOSED CONDITIONS ===', diagnosedConditions);
+  console.log('=== USER GROUP ===', userGroup);
+  console.log('=== CONDITIONS ===', conditions);
 
   return [
     `[USER GROUP: ${userGroup}]`,
@@ -514,40 +455,28 @@ function buildReviewPrompt(body: CoachRequestBody, totals: NutritionTotals) {
     `Age: ${age || '28'} | Gender: ${extractProfileField(profileSummary, 'Biological sex for BMR math') || 'Unknown'} | Weight: ${weight || 'Unknown'} | Height: ${height || 'Unknown'}`,
     `Diagnosed conditions: ${conditions}. RULE: Because this user has ${conditions}, you MUST use the ${userGroup} system prompt rules. Skip your own safety check — it has already been done.`,
     `Nutrition plan preference: ${nutritionPlanPreference || 'No stated preference'}`,
-    ...(meals.length > 0
-      ? [
-          'Current Intake:',
-          `  Total:     ${Math.round(totals.calories)}cal | P:${Math.round(totals.protein)}g | F:${Math.round(totals.fat)}g | C:${Math.round(totals.carbs)}g`,
-          mealLines,
-        ]
-      : []),
+    ...(meals.length > 0 ? [
+      'Current Intake:',
+      `  Total:     ${Math.round(totals.calories)}cal | P:${Math.round(totals.protein)}g | F:${Math.round(totals.fat)}g | C:${Math.round(totals.carbs)}g`,
+      mealLines,
+    ] : []),
     '',
     'Note: Always refer to the user as "User" not "Patient" in your response. IMPORTANT: Only apply condition-specific safety rules if conditions are EXPLICITLY listed in the Conditions field above. If Conditions says "None of the above" or "None reported", treat this user as a completely healthy adult with NO medical conditions. Do NOT infer, assume, or mention diabetes, depression, or any other condition. Do NOT reject the request based on inferred conditions. Always refer to the user as "User" not "Patient".',
     `Goal: ${goal}`,
     `Targets:\n${body.goalsSummary || 'Not provided'}`,
     meals.length === 0
-      ? `Request: The user has not logged any meals yet. Based on their profile and targets, provide: ${
-          pref.includes('week')
-            ? 'a 7-day meal plan with daily calorie and macro targets.'
-            : pref.includes('day')
-              ? 'a detailed 1-day meal plan with calories and macros per meal.'
-              : pref.includes('target')
-                ? 'recommended daily calorie and macro targets only, no specific meals.'
-                : pref.includes('critique')
-                  ? 'general dietary advice and recommendations based on their profile.'
-                  : 'a personalised nutrition plan and practical dietary advice.'
-        }`
-      : `Request: Review today's intake against the targets and provide: ${
-          pref.includes('week')
-            ? 'a 7-day meal plan adjustment.'
-            : pref.includes('day')
-              ? 'a corrected 1-day meal plan.'
-              : pref.includes('target')
-                ? 'recommended target adjustments only.'
-                : pref.includes('critique')
-                  ? "a critique of today's intake with specific adjustments."
-                  : 'practical diet advice.'
-        }`,
+      ? `Request: The user has not logged any meals yet. Based on their profile and targets, provide: ${nutritionPlanPreference?.toLowerCase().includes('week') ? 'a 7-day meal plan with daily calorie and macro targets.' :
+        nutritionPlanPreference?.toLowerCase().includes('day') ? 'a detailed 1-day meal plan with calories and macros per meal.' :
+          nutritionPlanPreference?.toLowerCase().includes('target') ? 'recommended daily calorie and macro targets only, no specific meals.' :
+            nutritionPlanPreference?.toLowerCase().includes('critique') ? 'general dietary advice and recommendations based on their profile.' :
+              'a personalised nutrition plan and practical dietary advice.'
+      }`
+      : `Request: Review today's intake against the targets and provide: ${nutritionPlanPreference?.toLowerCase().includes('week') ? 'a 7-day meal plan adjustment.' :
+        nutritionPlanPreference?.toLowerCase().includes('day') ? 'a corrected 1-day meal plan.' :
+          nutritionPlanPreference?.toLowerCase().includes('target') ? 'recommended target adjustments only.' :
+            nutritionPlanPreference?.toLowerCase().includes('critique') ? 'a critique of today\'s intake with specific adjustments.' :
+              'practical diet advice.'
+      }`,
   ].join('\n');
 }
 
@@ -566,51 +495,36 @@ app.post('/api/coach/daily-feedback', async (request, response) => {
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 },
     );
-    let reviewResponse: Response;
-    try {
-      reviewResponse = await fetch(`${REVIEW_API_BASE_URL}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: buildReviewPrompt(body, totals),
-        }),
-      });
-    } catch (fetchError) {
-      const reason = fetchError instanceof Error ? fetchError.message : String(fetchError);
-      const isNetwork =
-        reason === 'fetch failed' ||
-        (fetchError instanceof TypeError && /fetch|network|ECONNREFUSED|ENOTFOUND|certificate/i.test(reason));
-      if (isNetwork) {
-        throw new Error(
-          `Could not reach the review API at ${REVIEW_API_BASE_URL}/analyze (${reason}). ` +
-            'If this was a Colab Cloudflare URL, it expires when the notebook stops—open API_Calling.ipynb, start a new tunnel, and set AI_REVIEW_API_BASE_URL in .env.local to the new base URL (no trailing slash). ' +
-            'For local coaching, run the review server on port 8000 (e.g. `npm run start:local` or `python scripts/review_mps_server.py`) and use AI_REVIEW_API_BASE_URL=http://127.0.0.1:8000.',
-        );
-      }
-      throw fetchError;
-    }
+    const reviewResponse = await fetch(`${REVIEW_API_BASE_URL}/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: buildReviewPrompt(body, totals),
+      }),
+    });
 
     const rawText = await reviewResponse.text();
     if (!reviewResponse.ok) {
       throw new Error(`The review API failed with status ${reviewResponse.status}: ${rawText}`);
     }
 
-    const { advice } = parseReviewApiJsonBody(rawText);
+    const parsed = JSON.parse(rawText) as { advice?: string };
+    if (!parsed.advice?.trim()) {
+      throw new Error('The review API returned an empty response.');
+    }
 
     response.json({
-      advice,
+      advice: parsed.advice.trim(),
       generated_at: new Date().toISOString(),
       meal_count: meals.length,
     } satisfies CoachApiResponseBody);
   } catch (error) {
     const status = (error as Error & { status?: number }).status || 500;
-    const message =
-      error instanceof Error ? error.message : typeof error === 'string' ? error : 'Daily feedback failed.';
-    if (!response.headersSent) {
-      response.status(status).json({ error: message });
-    }
+    response.status(status).json({
+      error: error instanceof Error ? error.message : 'Daily feedback failed.',
+    });
   }
 });
 
