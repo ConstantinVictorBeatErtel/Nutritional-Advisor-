@@ -26,7 +26,7 @@ function formatMacro(value?: number) {
 
 function buildLoggedMeal(analysis: VisionAnalysisResult, ingredientsText: string, portionText: string): LoggedMeal {
   return {
-    id: crypto.randomUUID(),
+    id: Math.random().toString(36).slice(2) + Date.now().toString(36),
     title: analysis.meal_name || 'Logged meal',
     mealType: analysis.meal_type || 'Meal',
     createdAt: new Date().toISOString(),

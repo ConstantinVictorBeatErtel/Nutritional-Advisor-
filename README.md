@@ -18,7 +18,7 @@ This app uses **two local Python services**: Vitality vision (meal photo) on por
 
 1. Install Node dependencies: `npm install`
 2. Copy `scripts/local-paths.env.example` to `scripts/local-paths.env` if your folders are not the defaults inside that file.
-3. Ensure the review API venv has its dependencies (Unsloth, FastAPI, etc.); set `REVIEW_PYTHON` / `VISION_PYTHON` in `scripts/local-paths.env` if you use project-specific interpreters (for example the frozen bundle’s `.venv311arm2`).
+3. Ensure the review API venv has its dependencies (Unsloth, FastAPI, etc.); set `REVIEW_PYTHON` / `VISION_PYTHON` in `scripts/local-paths.env` if you use project-specific interpreters (for example the frozen bundle’s `.venv311arm2`). With `REVIEW_MODE=full`, the stack prefers **`api_server.py` in the repo root** (fine-tuned nutrition LLM); otherwise it uses `NUTRITION_REVIEW_DIR`. For remote hosting, use **`API_Calling.ipynb`** in Colab + Cloudflare Tunnel and set `AI_REVIEW_API_BASE_URL` in `.env.local`.
 4. Run everything:
 
    ```bash

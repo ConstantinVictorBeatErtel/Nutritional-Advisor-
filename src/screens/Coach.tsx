@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { motion } from 'motion/react';
 import { BrainCircuit, LoaderCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { getDailyCoachFeedback, type DailyCoachFeedback } from '../lib/coach';
@@ -33,13 +34,6 @@ function formatDateTime(value: string) {
   });
 }
 
-function splitAdvice(advice: string) {
-  return advice
-    .split(/\n{2,}/)
-    .map((section) => section.trim())
-    .filter(Boolean);
-}
-
 export default function Coach({ meals, profile, nutritionTargets, onRemoveMeal }: CoachProps) {
   const [feedback, setFeedback] = useState<DailyCoachFeedback>(FALLBACK_FEEDBACK);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +41,11 @@ export default function Coach({ meals, profile, nutritionTargets, onRemoveMeal }
   const totals = useMemo(() => sumMeals(meals), [meals]);
 
   const loadFeedback = async () => {
+    if (profile.nutritionPlanPreference === 'intake-critique' && meals.length < 3) {
+      setErrorMessage('Please log at least three meals before requesting an Intake Critique.');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setErrorMessage(null);
@@ -68,8 +67,6 @@ export default function Coach({ meals, profile, nutritionTargets, onRemoveMeal }
   useEffect(() => {
     void loadFeedback();
   }, [meals, profile, nutritionTargets]);
-
-  const adviceSections = splitAdvice(feedback.advice);
 
   return (
     <motion.div
@@ -114,12 +111,8 @@ export default function Coach({ meals, profile, nutritionTargets, onRemoveMeal }
             </div>
             <div>
               <h3 className="text-3xl font-extrabold tracking-tight text-zinc-900">Nutrition Review</h3>
-              <div className="mt-4 space-y-4 max-w-3xl">
-                {adviceSections.map((section, index) => (
-                  <p key={index} className="text-zinc-600 leading-relaxed whitespace-pre-wrap">
-                    {section}
-                  </p>
-                ))}
+              <div className="mt-4 max-w-3xl text-zinc-600 leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:text-xl [&_h2]:font-bold [&_strong]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_table]:my-4 [&_table]:w-full [&_th]:border [&_td]:border [&_th]:p-2 [&_td]:p-2 [&_p]:mb-3 [&_p:last-child]:mb-0">
+                <ReactMarkdown>{feedback.advice}</ReactMarkdown>
               </div>
             </div>
           </div>

@@ -28,10 +28,17 @@ if [[ ! -f "$VITALITY_RUNTIME_DIR/vision_api_server.py" ]]; then
   exit 1
 fi
 
-if [[ "$REVIEW_MODE" == "full" ]] && [[ ! -f "$NUTRITION_REVIEW_DIR/api_server.py" ]]; then
-  echo "Missing review API at $NUTRITION_REVIEW_DIR/api_server.py"
-  echo "Set NUTRITION_REVIEW_DIR in scripts/local-paths.env (see local-paths.env.example)."
-  exit 1
+REVIEW_API_DIR="$ROOT"
+if [[ "$REVIEW_MODE" == "full" ]]; then
+  if [[ -f "$ROOT/api_server.py" ]]; then
+    REVIEW_API_DIR="$ROOT"
+  elif [[ -f "$NUTRITION_REVIEW_DIR/api_server.py" ]]; then
+    REVIEW_API_DIR="$NUTRITION_REVIEW_DIR"
+  else
+    echo "Missing Unsloth review API: expected $ROOT/api_server.py or $NUTRITION_REVIEW_DIR/api_server.py"
+    echo "Set NUTRITION_REVIEW_DIR in scripts/local-paths.env (see local-paths.env.example)."
+    exit 1
+  fi
 fi
 
 PIDS=()
@@ -73,7 +80,7 @@ PIDS+=("$!")
 if [[ "$REVIEW_MODE" == "full" ]]; then
   echo "Starting review LLM (Unsloth/CUDA) on :${REVIEW_PORT} — first load can take several minutes..."
   (
-    cd "$NUTRITION_REVIEW_DIR"
+    cd "$REVIEW_API_DIR"
     exec "$REVIEW_PYTHON" -c "
 import uvicorn
 from api_server import app
