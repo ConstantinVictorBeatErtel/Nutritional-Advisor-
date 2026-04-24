@@ -41,11 +41,6 @@ export default function Coach({ meals, profile, nutritionTargets, onRemoveMeal }
   const totals = useMemo(() => sumMeals(meals), [meals]);
 
   const loadFeedback = async () => {
-    if (profile.nutritionPlanPreference === 'intake-critique' && meals.length < 3) {
-      setErrorMessage('Please log at least three meals before requesting an Intake Critique.');
-      return;
-    }
-
     try {
       setIsLoading(true);
       setErrorMessage(null);
