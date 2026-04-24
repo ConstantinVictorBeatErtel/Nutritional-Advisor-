@@ -48,8 +48,21 @@ export async function postJson<TResponse>(path: string, payload: unknown): Promi
   }
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `Request failed with status ${response.status}.`);
+    const errorText = (await response.text()).trim();
+    let message = errorText;
+    if (errorText.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(errorText) as { error?: unknown };
+        if (typeof parsed.error === 'string' && parsed.error.trim()) {
+          message = parsed.error.trim();
+        }
+      } catch {
+        /* keep raw body */
+      }
+    }
+    throw new Error(
+      message || `Request failed with status ${response.status} (empty body). Check the terminal running npm run dev:api.`,
+    );
   }
 
   return response.json() as Promise<TResponse>;
